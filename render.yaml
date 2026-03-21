@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: taxi-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: API_SECRET
+        value: taxi2026
+      - key: PYTHON_VERSION
+        value: "3.11.0"

@@ -752,12 +752,26 @@ def push_data():
     DATA["last_update"] = time.time()
     return jsonify({"status": "updated", "keys": list(data.keys())}), 200
 
+@app.route("/api/push_alerts", methods=["POST"])
+def push_alerts():
+    """Receive real alerts from Telegram scraper"""
+    data = request.get_json(silent=True)
+    if not data or data.get("secret") != SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+    alerts = data.get("alerts", [])
+    if isinstance(alerts, list):
+        DATA["alerts"] = alerts
+        DATA["last_update"] = time.time()
+        print(f"[TG SCRAPER] Received {len(alerts)} real alerts from Telegram")
+        return jsonify({"status": "ok", "count": len(alerts)}), 200
+    return jsonify({"error": "invalid alerts"}), 400
+
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({"service": "Taxi Assistant API", "auto_update": True,
                     "endpoints": ["/api/weather", "/api/events", "/api/alerts",
                                   "/api/demand", "/api/fuel", "/api/status",
-                                  "/api/analyze_order"]})
+                                  "/api/analyze_order", "/api/push_alerts"]})
 
 
 start_fetchers()

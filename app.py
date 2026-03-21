@@ -139,49 +139,48 @@ def fetch_demand():
             zones = []
             if 7 <= hour <= 9 and not is_weekend:
                 zones = [
-                    {"name": "Спальные районы → Центр", "coefficient": round(1.5 * traffic / 1.5, 1), "score": 85},
-                    {"name": "Метро (кольцевая)", "coefficient": round(1.3 * traffic / 1.5, 1), "score": 70},
-                    {"name": "Железнодорожные вокзалы", "coefficient": round(1.4 * traffic / 1.5, 1), "score": 75},
-                    {"name": "Аэропорт Домодедово", "coefficient": 1.4, "score": 65},
-                    {"name": "Аэропорт Шереметьево", "coefficient": 1.5, "score": 72},
+                    {"name": "Спальные → Центр (утро)", "address": "ул. Люблинская / Марьино", "lat": 55.650, "lon": 37.744, "coefficient": round(1.5 * traffic / 1.5, 1), "score": 85},
+                    {"name": "Ленинградский вокзал", "address": "Комсомольская пл., 3", "lat": 55.776, "lon": 37.655, "coefficient": round(1.4 * traffic / 1.5, 1), "score": 75},
+                    {"name": "Казанский вокзал", "address": "Комсомольская пл., 2", "lat": 55.775, "lon": 37.657, "coefficient": round(1.4 * traffic / 1.5, 1), "score": 73},
+                    {"name": "Аэропорт Домодедово", "address": "Домодедово, терминал", "lat": 55.408, "lon": 37.906, "coefficient": 1.4, "score": 65},
+                    {"name": "Аэропорт Шереметьево", "address": "Шереметьево, терминал B/D", "lat": 55.972, "lon": 37.414, "coefficient": 1.5, "score": 72},
                 ]
             elif 12 <= hour <= 14:
                 zones = [
-                    {"name": "ТЦ и торговые зоны", "coefficient": 1.3, "score": 60},
-                    {"name": "Деловой центр Москва-Сити", "coefficient": 1.2, "score": 55},
-                    {"name": "Центр (садовое)", "coefficient": 1.1, "score": 50},
-                    {"name": "Аэропорты", "coefficient": 1.4, "score": 65},
+                    {"name": "Авиапарк", "address": "Ходынский бул., 4", "lat": 55.789, "lon": 37.532, "coefficient": 1.3, "score": 60},
+                    {"name": "Москва-Сити (башни)", "address": "Пресненская наб., 10", "lat": 55.749, "lon": 37.537, "coefficient": 1.2, "score": 55},
+                    {"name": "ГУМ / Красная площадь", "address": "Красная пл., 3", "lat": 55.755, "lon": 37.621, "coefficient": 1.1, "score": 50},
+                    {"name": "Аэропорт Шереметьево", "address": "Шереметьево, терминал B/D", "lat": 55.972, "lon": 37.414, "coefficient": 1.4, "score": 65},
+                    {"name": "МЕГА Тёплый Стан", "address": "Калужское ш., 21-й км", "lat": 55.613, "lon": 37.476, "coefficient": 1.2, "score": 52},
                 ]
             elif 17 <= hour <= 20:
                 zones = [
-                    {"name": "Центр → Спальные районы", "coefficient": round(1.5 * traffic / 1.5, 1), "score": 90},
-                    {"name": "Деловые центры (Сити)", "coefficient": round(1.6 * traffic / 1.5, 1), "score": 92},
-                    {"name": "ТЦ МЕГА, Авиапарк", "coefficient": 1.6, "score": 75},
-                    {"name": "Аэропорт Внуково", "coefficient": 1.7, "score": 80},
-                    {"name": "Аэропорт Шереметьево", "coefficient": 1.8, "score": 83},
+                    {"name": "Москва-Сити → спальные", "address": "Пресненская наб., 10", "lat": 55.749, "lon": 37.537, "coefficient": round(1.6 * traffic / 1.5, 1), "score": 92},
+                    {"name": "Новый Арбат / Смоленская", "address": "Новый Арбат, 21", "lat": 55.752, "lon": 37.585, "coefficient": round(1.5 * traffic / 1.5, 1), "score": 90},
+                    {"name": "Авиапарк / Ходынка", "address": "Ходынский бул., 4", "lat": 55.789, "lon": 37.532, "coefficient": 1.6, "score": 75},
+                    {"name": "Аэропорт Внуково", "address": "Внуково, терминал A", "lat": 55.596, "lon": 37.275, "coefficient": 1.7, "score": 80},
+                    {"name": "Аэропорт Шереметьево", "address": "Шереметьево, терминал B/D", "lat": 55.972, "lon": 37.414, "coefficient": 1.8, "score": 83},
                 ]
             elif 22 <= hour or hour <= 4:
                 base = 2.0 if is_weekend else 1.7
                 zones = [
-                    {"name": "Бары и клубы (Центр)", "coefficient": round(base + 0.3, 1), "score": 95},
-                    {"name": "Рестораны Патриаршие", "coefficient": round(base + 0.1, 1), "score": 85},
-                    {"name": "Центр (в пределах ТТК)", "coefficient": round(base - 0.2, 1), "score": 70},
-                    {"name": "Аэропорты (ночные рейсы)", "coefficient": round(base, 1), "score": 82},
-                    {"name": "Спальные районы", "coefficient": 1.0, "score": 35},
+                    {"name": "Патриаршие пруды / бары", "address": "Б. Патриарший пер., 7", "lat": 55.763, "lon": 37.594, "coefficient": round(base + 0.3, 1), "score": 95},
+                    {"name": "Камергерский / Столешников", "address": "Камергерский пер., 6", "lat": 55.760, "lon": 37.613, "coefficient": round(base + 0.2, 1), "score": 90},
+                    {"name": "Китай-город / бары", "address": "Маросейка, 13", "lat": 55.757, "lon": 37.638, "coefficient": round(base + 0.1, 1), "score": 85},
+                    {"name": "Красный Октябрь / Стрелка", "address": "Берсеневская наб., 6", "lat": 55.742, "lon": 37.610, "coefficient": round(base, 1), "score": 80},
+                    {"name": "Шереметьево (ночные рейсы)", "address": "Шереметьево, терминал B/D", "lat": 55.972, "lon": 37.414, "coefficient": round(base, 1), "score": 82},
                 ]
             else:
                 zones = [
-                    {"name": "Центр", "coefficient": 1.2, "score": 55},
-                    {"name": "Аэропорты", "coefficient": 1.5, "score": 68},
-                    {"name": "Вокзалы", "coefficient": 1.3, "score": 60},
-                    {"name": "ТЦ и торговые зоны", "coefficient": 1.1, "score": 48},
-                    {"name": "Спальные районы", "coefficient": 1.0, "score": 40},
+                    {"name": "Тверская / Пушкинская", "address": "Тверская ул., 15", "lat": 55.764, "lon": 37.605, "coefficient": 1.2, "score": 55},
+                    {"name": "Аэропорт Шереметьево", "address": "Шереметьево, терминал B/D", "lat": 55.972, "lon": 37.414, "coefficient": 1.5, "score": 68},
+                    {"name": "Курский вокзал", "address": "ул. Земляной Вал, 29", "lat": 55.758, "lon": 37.660, "coefficient": 1.3, "score": 60},
+                    {"name": "МЕГА Химки", "address": "МКАД 65-й км", "lat": 55.893, "lon": 37.398, "coefficient": 1.1, "score": 48},
+                    {"name": "Бутово / Южная", "address": "ул. Южнобутовская", "lat": 55.546, "lon": 37.576, "coefficient": 1.0, "score": 40},
                 ]
             for z in zones:
                 z["coefficient"] = round(z["coefficient"] + random.uniform(-0.1, 0.1), 1)
                 z["score"] = max(10, min(100, z["score"] + random.randint(-5, 5)))
-            # Add traffic info
-            for z in zones:
                 z["traffic_multiplier"] = traffic
             DATA["demand"] = sorted(zones, key=lambda x: -x["score"])
             DATA["last_update"] = time.time()

@@ -781,7 +781,12 @@ def index():
     return jsonify({"service": "Taxi Assistant API", "auto_update": True,
                     "endpoints": ["/api/weather", "/api/events", "/api/alerts",
                                   "/api/demand", "/api/fuel", "/api/status",
-                                  "/api/analyze_order", "/api/push_alerts"]})
+                                  "/api/analyze_order", "/api/push_alerts", "/api/traffic"]})
+
+@app.route("/app/TaxiAssistant.html", methods=["GET"])
+def serve_html():
+    return app.send_static_file("TaxiAssistant.html")
+
 
 
 start_fetchers()

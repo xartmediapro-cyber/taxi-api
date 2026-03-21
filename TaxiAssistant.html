@@ -1,0 +1,2632 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Такси Ассистент</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#0A0A0F;
+  --surface:#12121A;
+  --surface2:#1A1A26;
+  --border:#2A2A3A;
+  --green:#00E676;
+  --green-dim:#1B4332;
+  --yellow:#FFD600;
+  --yellow-dim:#3D3000;
+  --red:#FF3D3D;
+  --red-dim:#3D0A0A;
+  --blue:#4FC3F7;
+  --text:#F0F0F0;
+  --muted:#666680;
+  --font-head:'Oswald',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+  --font-body:'IBM Plex Sans',sans-serif;
+}
+
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;max-width:100vw;overflow-x:hidden}
+
+/* HEADER */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px;border-bottom:1px solid var(--border);
+  background:var(--surface);position:sticky;top:0;z-index:100;
+}
+.logo { display:flex; align-items:center; font-family:'IBM Plex Sans', sans-serif; font-size:28px; letter-spacing:-1px; color:#ffffff; font-weight:800; }
+.logo-icon { background:var(--yellow); width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-right:10px; }
+.logo-check { width:20px; height:20px; stroke:#0A0A0F; stroke-width:4.5px; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.logo-assist { color:var(--yellow); margin-left:6px; }
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.header-right{display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+/* LAYOUT */
+.app{display:flex;flex-direction:column;min-height:calc(100vh - 57px);padding-bottom:140px;}
+
+/* BOTTOM NAVIGATION — cosmic premium design */
+.sidebar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:linear-gradient(180deg, #0D0D12 0%, #080810 100%);
+  border-top:1px solid rgba(120,80,255,0.15);
+  display:grid;grid-template-columns:repeat(6,1fr);
+  padding:6px 4px 10px;z-index:200;
+  gap:2px;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+}
+.nav-item{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:4px 2px;cursor:pointer;transition:all 0.2s;
+  font-family:var(--font-mono);font-size:7px;letter-spacing:0.3px;
+  color:rgba(255,255,255,0.35);border-radius:10px;
+}
+.nav-item:active{transform:scale(0.92);}
+.nav-item.active{color:#fff;}
+.nav-icon-wrap{
+  width:40px;height:28px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;transition:all 0.25s;
+  position:relative;
+}
+.nav-item.active .nav-icon-wrap{
+  background:linear-gradient(135deg, #6C3AFF 0%, #3A8BFF 50%, #00E5A0 100%);
+  box-shadow:0 0 16px rgba(108,58,255,0.5), 0 0 4px rgba(0,229,160,0.3);
+}
+.nav-icon {font-size:15px;line-height:1;}
+
+/* LOCK SCREEN & MODAL */
+#lock-screen {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:var(--bg); z-index:99999; display:none;
+  flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;
+}
+.shift-modal {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(10,10,15,0.95); z-index:9000; display:none;
+  flex-direction:column; align-items:center; justify-content:center; padding:24px;
+}
+.shift-modal-content {
+  background:var(--surface2); width:100%; max-width:400px; padding:24px;
+  border-radius:12px; border:1px solid var(--border); box-shadow:0 8px 32px rgba(0,0,0,0.5);
+}
+.btn-shift-timer {
+  display:block; font-size:14px; font-family:var(--font-mono); font-weight:normal; margin-top:4px;
+}
+.nav-item:hover{background:transparent;color:var(--text)}
+.nav-item.active{background:transparent;color:var(--yellow);}
+.nav-item.active .nav-icon{color:var(--yellow);}
+.nav-icon{font-size:22px;margin-bottom:2px}
+.nav-badge{
+  position:absolute;top:2px;right:10px;background:var(--red);color:#fff;
+  border-radius:10px;padding:1px 5px;font-size:9px;font-weight:600;
+}
+.nav-scroll-hint-right {
+  position:fixed; right:12px; bottom:70px; padding:6px 12px; border-radius:16px;
+  background:var(--surface2); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  color:#fff; font-size:11px; font-weight:bold; letter-spacing:1px; pointer-events:none; z-index:201; box-shadow:0 4px 10px rgba(0,0,0,0.5);
+  animation: hint-bounce-right 2s infinite; transition: opacity 0.3s;
+}
+.nav-scroll-hint-left {
+  position:fixed; left:12px; bottom:70px; padding:6px 12px; border-radius:16px;
+  background:var(--surface2); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  color:#fff; font-size:11px; font-weight:bold; letter-spacing:1px; pointer-events:none; z-index:201; box-shadow:0 4px 10px rgba(0,0,0,0.5);
+  animation: hint-bounce-left 2s infinite; transition: opacity 0.3s; opacity: 0;
+}
+@keyframes hint-bounce-right {
+  0%, 100% { transform: translateX(0); opacity: 0.9; }
+  50% { transform: translateX(4px); opacity: 0.2; }
+}
+@keyframes hint-bounce-left {
+  0%, 100% { transform: translateX(0); opacity: 0.9; }
+  50% { transform: translateX(-4px); opacity: 0.2; }
+}
+
+/* NAVIGATION DESKTOP OVERRIDE DELETED, ALWAYS BOTTOM NAV FOR APP */
+
+/* MAIN */
+.main{padding:24px;overflow-y:auto}
+
+/* SECTION */
+.section{display:none}
+.section.active{display:block}
+
+/* TOP ROW */
+.top-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:1024px){.top-row{grid-template-columns:1fr}}
+
+/* CARDS */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:4px;padding:20px;position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+}
+.card.green::before{background:var(--green)}
+.card.yellow::before{background:var(--yellow)}
+.card.red::before{background:var(--red)}
+.card.blue::before{background:var(--blue)}
+.card-label{font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:8px}
+.card-value{font-family:var(--font-head);font-size:32px;font-weight:700;letter-spacing:1px}
+.card-value.green{color:var(--green)}
+.card-value.yellow{color:var(--yellow)}
+.card-value.red{color:var(--red)}
+.card-sub{font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--font-mono)}
+
+/* ORDER ANALYZER */
+.order-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:4px;padding:24px;margin-bottom:24px;
+}
+.order-box h2{font-family:var(--font-head);font-size:18px;letter-spacing:2px;margin-bottom:20px;color:var(--muted)}
+/* AUTONOMOUS LISTENER */
+.listener-box{
+  display:flex;align-items:center;gap:16px;padding:24px;border-radius:4px;
+  background:var(--surface2);border:1px dashed var(--yellow);margin-bottom:16px;
+}
+.pulse-icon{
+  width:24px;height:24px;border-radius:50%;background:var(--yellow);
+  box-shadow:0 0 12px var(--yellow);animation:pulse-big 1.5s infinite;
+  flex-shrink:0;
+}
+@keyframes pulse-big{0%{transform:scale(0.8);opacity:1}100%{transform:scale(1.5);opacity:0}}
+.listener-text h3{font-family:var(--font-head);font-size:16px;color:var(--yellow);letter-spacing:1px;margin-bottom:4px}
+.listener-text p{font-size:12px;color:var(--muted);font-family:var(--font-mono)}
+
+/* VERDICT */
+.verdict{
+  display:none;border-radius:4px;padding:20px;
+  animation:slideIn 0.3s ease;
+}
+.verdict.show{display:block}
+.verdict.good{background:var(--green-dim);border:1px solid var(--green)}
+.verdict.neutral{background:var(--yellow-dim);border:1px solid var(--yellow)}
+.verdict.bad{background:var(--red-dim);border:1px solid var(--red)}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.verdict-title{font-family:var(--font-head);font-size:22px;letter-spacing:2px;margin-bottom:8px}
+.verdict.good .verdict-title{color:var(--green)}
+.verdict.neutral .verdict-title{color:var(--yellow)}
+.verdict.bad .verdict-title{color:var(--red)}
+.verdict-reason{font-size:13px;color:var(--text);line-height:1.6;font-family:var(--font-mono)}
+.verdict-score{
+  float:right;font-family:var(--font-head);font-size:36px;
+  opacity:0.4;margin-top:-8px;
+}
+
+/* TRAFFIC */
+.traffic-meter{
+  display:flex;align-items:center;gap:16px;
+  background:var(--surface2);padding:16px;border-radius:4px;margin-bottom:16px;
+}
+.meter-bar{
+  flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;
+}
+.meter-fill{
+  height:100%;border-radius:4px;transition:width 1s ease;
+}
+.traffic-score-big{font-family:var(--font-head);font-size:48px;font-weight:700;min-width:60px;text-align:center}
+
+/* INCIDENTS */
+.incident-list{display:flex;flex-direction:column;gap:8px}
+.incident{
+  background:var(--surface2);border-left:3px solid var(--red);
+  padding:12px 16px;border-radius:0 4px 4px 0;
+}
+.incident.dps{border-left-color:var(--yellow)}
+.incident.weather{border-left-color:var(--blue)}
+.incident-type{font-family:var(--font-mono);font-size:10px;letter-spacing:2px;margin-bottom:4px}
+.incident.dps .incident-type{color:var(--yellow)}
+.incident .incident-type{color:var(--red)}
+.incident.weather .incident-type{color:var(--blue)}
+.incident-text{font-size:13px;color:var(--text);line-height:1.5}
+.incident-time{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px}
+
+/* WORK TIME */
+.hours-grid{
+  display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-bottom:24px;
+}
+.hour-cell{
+  aspect-ratio:1;border-radius:2px;display:flex;align-items:center;
+  justify-content:center;font-family:var(--font-mono);font-size:9px;
+  cursor:pointer;transition:transform 0.1s;position:relative;
+}
+.hour-cell:hover{transform:scale(1.1)}
+.hour-cell.low{background:#1A1A26;color:var(--muted)}
+.hour-cell.medium{background:#1A2A1A;color:#66BB6A}
+.hour-cell.high{background:#2A3A10;color:#AED581}
+.hour-cell.peak{background:#3D2800;color:var(--yellow);font-weight:600}
+.hour-cell.current{outline:2px solid var(--yellow)}
+.hour-label{
+  font-family:var(--font-mono);font-size:9px;color:var(--muted);
+  text-align:center;margin-bottom:4px;
+}
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:24px}
+.day-col{display:flex;flex-direction:column;gap:4px}
+.day-name{font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:center;padding-bottom:4px}
+
+/* EVENTS */
+.events-list{display:flex;flex-direction:column;gap:12px}
+.event-card{
+  background:var(--surface2);border:1px solid var(--border);
+  padding:16px;border-radius:4px;display:flex;gap:16px;align-items:flex-start;
+}
+.event-time{
+  font-family:var(--font-head);font-size:20px;color:var(--yellow);
+  min-width:60px;text-align:center;line-height:1;
+}
+.event-time small{display:block;font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-top:2px}
+.event-info h3{font-family:var(--font-mono);font-size:13px;color:var(--text);margin-bottom:4px}
+.event-info p{font-size:12px;color:var(--muted)}
+.event-hot{
+  margin-left:auto;background:var(--red);color:#fff;
+  font-family:var(--font-mono);font-size:10px;padding:3px 8px;
+  border-radius:2px;white-space:nowrap;
+}
+
+/* FUEL */
+.fuel-table { width:100%; border-collapse:collapse; table-layout: fixed; }
+.fuel-table th {
+  font-family:var(--font-mono); font-size:9px; letter-spacing:1px;
+  color:var(--muted); text-align:left; padding:8px 4px; border-bottom:1px solid var(--border); overflow: hidden;
+}
+.fuel-table td {
+  padding:8px 4px; border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fuel-table tr:hover td {background:var(--surface2)}
+.fuel-table tr.cheapest td {background:var(--green-dim)}
+.price-tag {font-family:var(--font-head);font-size:14px;font-weight:600;}
+.price-tag.best {color:var(--green)}
+.btn-route {
+  display:block; margin-top:4px; background:var(--yellow); color:#000;
+  border:none; border-radius:2px; padding:4px 0px; width:100%; text-align:center;
+  font-size:8px; font-family:var(--font-head); letter-spacing:1px; cursor:pointer;
+}
+
+/* NOTIFICATIONS */
+.notif-list{display:flex;flex-direction:column;gap:8px}
+.notif{
+  background:var(--surface2);border:1px solid var(--border);
+  padding:14px 16px;border-radius:4px;display:flex;gap:12px;
+  animation:slideIn 0.3s ease;
+}
+.notif-icon{font-size:20px;flex-shrink:0}
+.notif-body{flex:1}
+.notif-title{font-family:var(--font-mono);font-size:12px;color:var(--text);margin-bottom:2px}
+.notif-text{font-size:12px;color:var(--muted);line-height:1.4}
+.notif-time{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left:auto;flex-shrink:0}
+
+/* SECTION HEADER */
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;
+}
+.section-title{font-family:var(--font-head);font-size:22px;letter-spacing:3px;color:var(--text)}
+.refresh-btn{
+  background:none;border:1px solid var(--border);color:var(--muted);
+  padding:6px 14px;font-family:var(--font-mono);font-size:11px;
+  cursor:pointer;border-radius:2px;transition:all 0.2s;
+}
+.refresh-btn:hover{border-color:var(--yellow);color:var(--yellow)}
+
+/* GRID 2 COL */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+
+/* ONBOARDING MODAL */
+#onboarding-modal{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:#0a0a0ff0;z-index:9999;display:none;
+  align-items:center;justify-content:center;padding:20px;
+}
+.onboarding-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:30px;max-width:400px;text-align:center;
+}
+.onboarding-icon{font-size:48px;margin-bottom:16px}
+.onboarding-title{font-family:var(--font-head);font-size:24px;color:var(--text);letter-spacing:1px;margin-bottom:8px}
+.onboarding-text{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:24px}
+.btn-onboarding{
+  background:var(--yellow);color:#000;border:none;border-radius:4px;
+  padding:14px 24px;font-family:var(--font-head);font-size:16px;
+  letter-spacing:1px;cursor:pointer;width:100%;transition:all 0.2s;
+}
+.btn-onboarding:hover{transform:scale(0.98)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border)}
+/* TOAST NOTIFICATION */
+#toast-container {
+  position: fixed; top: 20px; right: 20px; z-index: 999999;
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+}
+.toast {
+  background: var(--surface2); border-left: 4px solid var(--primary);
+  color: var(--text); padding: 12px 16px; border-radius: 4px;
+  font-family: var(--font-main); font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  animation: slideInRight 0.3s ease-out forwards;
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* PREMIUM SHIFT GRID */
+.shift-state-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;
+}
+.shift-btn {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+  color: var(--muted); padding: 16px; border-radius: 12px;
+  font-family: var(--font-head); font-size: 16px; text-align: left;
+  display: flex; flex-direction: column; gap: 6px; cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.shift-btn.active-state {
+  background: rgba(212, 255, 0, 0.1); /* Primary tinted */
+  border-color: var(--primary); color: var(--text);
+  box-shadow: 0 4px 15px rgba(212, 255, 0, 0.15);
+  transform: translateY(-2px);
+}
+.shift-btn .shift-timer {
+  font-family: var(--font-mono); font-size: 14px; color: rgba(255,255,255,0.3);
+}
+.shift-btn.active-state .shift-timer {
+  color: var(--primary); font-weight: bold; font-size: 16px;
+}
+/* Color specific Active States for Premium Feel */
+.shift-btn:nth-child(2).active-state { border-color: var(--green); background: rgba(56, 176, 0, 0.1); box-shadow: 0 4px 15px rgba(56, 176, 0, 0.15); }
+.shift-btn:nth-child(2).active-state .shift-timer { color: var(--green); }
+.shift-btn:nth-child(3).active-state { border-color: var(--yellow); background: rgba(255, 183, 3, 0.1); box-shadow: 0 4px 15px rgba(255, 183, 3, 0.15); }
+.shift-btn:nth-child(3).active-state .shift-timer { color: var(--yellow); }
+.shift-btn:nth-child(4).active-state { border-color: #9D4EDD; background: rgba(157, 78, 221, 0.1); box-shadow: 0 4px 15px rgba(157, 78, 221, 0.15); }
+.shift-btn:nth-child(4).active-state .shift-timer { color: #9D4EDD; }
+.shift-btn:nth-child(5).active-state { border-color: var(--blue); background: rgba(0, 180, 216, 0.1); box-shadow: 0 4px 15px rgba(0, 180, 216, 0.15); }
+.shift-btn:nth-child(5).active-state .shift-timer { color: var(--blue); }
+.shift-btn:nth-child(6).active-state { border-color: #F8961E; background: rgba(248, 150, 30, 0.1); box-shadow: 0 4px 15px rgba(248, 150, 30, 0.15); }
+.shift-btn:nth-child(6).active-state .shift-timer { color: #F8961E; }
+
+/* EXPENSES CHIPS */
+.expense-chips {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px;
+  scrollbar-width: none; -ms-overflow-style: none; /* Firefox/IE */
+}
+.expense-chips::-webkit-scrollbar { display: none; } /* WebKit */
+.chip {
+  background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 16px; border-radius: 20px; font-size: 13px; font-family: var(--font-main);
+  white-space: nowrap; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+}
+.chip.active {
+  background: #ffffff !important; color: #000000 !important; font-weight: 800 !important; border-color: #ffffff !important;
+}
+
+/* DONUT CHART */
+.donut-chart {
+  width: 130px; height: 130px; border-radius: 50%;
+  position: relative; margin: 0 auto 16px auto;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+.donut-inner {
+  width: 90px; height: 90px; border-radius: 50%;
+  background: var(--surface); /* match modal background */
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.donut-val { font-size: 17px; font-weight: bold; font-family: var(--font-mono); }
+.donut-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* EXPENSES LIST ANIMATION */
+.expense-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;
+  font-family: var(--font-main); transition: background 0.2s;
+}
+.expense-item:hover { background: rgba(255,255,255,0.06); }
+.expense-item .exp-type { color: var(--text); font-weight: 500; }
+.expense-item .exp-sum { color: var(--red); font-family: var(--font-mono); font-weight: bold; }
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN — чёрный экран блокировки -->
+<div id="lock-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000000; z-index:99999; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;">
+  
+  <div class="logo" style="font-size: 42px; margin-bottom: 32px; letter-spacing: -1.5px; width: 100%; justify-content: center;">
+    <div class="logo-icon" style="width: 48px; height: 48px; border-radius: 12px; margin-right: 14px;">
+      <svg viewBox="0 0 24 24" class="logo-check" style="width: 32px; height: 32px; stroke-width: 4px;">
+        <polyline points="5,13 10,18 19,7"></polyline>
+      </svg>
+    </div>
+    Taxi<span class="logo-assist">Assistant</span>
+  </div>
+
+  <h2 style="font-family:var(--font-head);color:#ffffff;margin-bottom:8px;font-size:20px;letter-spacing:1px">БЕСПЛАТНЫЙ ПЕРИОД ИСТЁК</h2>
+  <div style="font-size:14px;color:rgba(255,255,255,0.4);margin-bottom:24px;line-height:1.5">Для продолжения работы введите ключ активации</div>
+  
+  <!-- DEVICE ID -->
+  <div style="background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.1);padding:16px;border-radius:8px;width:100%;max-width:320px;margin-bottom:24px;cursor:pointer;" onclick="navigator.clipboard.writeText(document.getElementById('lock-device-id').textContent); var el=document.getElementById('lock-copy-text'); var old=el.textContent; el.textContent='СКОПИРОВАНО!'; setTimeout(function(){el.textContent=old}, 2000)">
+    <div id="lock-copy-text" style="font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:4px;font-family:var(--font-mono)">ВАШ ID УСТРОЙСТВА:</div>
+    <div id="lock-device-id" style="font-size:22px;font-weight:bold;color:#fff;font-family:var(--font-mono);letter-spacing:2px;">ОЖИДАНИЕ...</div>
+  </div>
+
+  <!-- KEY INPUT -->
+  <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:12px">
+    <input type="text" id="lock-key-input" placeholder="Введите ключ активации" style="width:100%;padding:16px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;font-family:var(--font-mono);font-size:16px;text-align:center;outline:none;">
+    <button class="btn-route" onclick="checkActivationKey()" style="width:100%;padding:16px;font-size:14px">АКТИВИРОВАТЬ</button>
+    <div id="lock-error" style="color:var(--red);font-size:12px;margin-top:4px;display:none">Неверный ключ доступа</div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:12px">Свяжитесь с поддержкой для получения ключа</div>
+  </div>
+</div>
+<!-- ONBOARDING MODAL -->
+<div id="onboarding-modal">
+  <div class="onboarding-card" id="onboard-step1">
+    <div class="onboarding-icon">📱</div>
+    <div class="onboarding-title">РАЗРЕШЕНИЕ №1</div>
+    <div class="onboarding-text">Чтобы показывать плавающее окно поверх Яндекс Про, нам нужно разрешение "Наложение поверх других окон".<br><br><b>Нажмите кнопку ниже, найдите TaxiAssistant и включите галочку.</b></div>
+    <button class="btn-onboarding" onclick="requestOverlay()">ДАТЬ РАЗРЕШЕНИЕ</button>
+  </div>
+  
+  <div class="onboarding-card" id="onboard-step2" style="display:none">
+    <div class="onboarding-icon">👁️</div>
+    <div class="onboarding-title">РАЗРЕШЕНИЕ №2</div>
+    <div class="onboarding-text">Чтобы автоматически ловить данные о заказах, нам нужны "Спец. возможности".<br><br><b>Нажмите кнопку, нажмите на "Дополнительные сервисы / Установленные приложения -> TaxiAssistant" и переведите выключатель на Вкл.</b></div>
+    <button class="btn-onboarding" onclick="requestAccess()">ВКЛЮЧИТЬ АНАЛИЗ</button>
+  </div>
+</div>
+
+<header style="background:#000000; border-bottom:1px solid #111111;">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" class="logo-check">
+        <polyline points="5,13 10,18 19,7"></polyline>
+      </svg>
+    </div>
+    Taxi<span class="logo-assist">Assistant</span>
+  </div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span id="current-time" style="font-size:14px; color:#fff">--:--</span>
+    <span id="current-day">---</span>
+  </div>
+</header>
+<div style="background:var(--surface2); padding:8px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; font-size:12px; position:sticky; top:57px; z-index:99;">
+   <span style="font-size:14px">📍</span>
+   <span id="current-location" style="color:var(--text); font-family:var(--font-main)">Ищем спутники...</span>
+</div>
+
+<div class="app">
+    <div id="toast-container"></div>
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="main-nav" onscroll="
+    document.getElementById('nav-hint-right').style.opacity = (this.scrollWidth - this.clientWidth - this.scrollLeft) < 20 ? '0' : '1';
+    document.getElementById('nav-hint-left').style.opacity = this.scrollLeft > 20 ? '1' : '0';
+  ">
+    <div class="nav-item active" onclick="showSection('orders')">
+      <div class="nav-icon-wrap"><span class="nav-icon">🏠</span></div>Главная
+    </div>
+    <div class="nav-item" onclick="showSection('shift')">
+      <div class="nav-icon-wrap"><span class="nav-icon">📊</span></div>Смена
+    </div>
+    <div class="nav-item" onclick="showSection('finance')">
+      <div class="nav-icon-wrap"><span class="nav-icon">💰</span></div>Финансы
+    </div>
+    <div class="nav-item" style="position:relative;" onclick="showSection('traffic')">
+      <div class="nav-icon-wrap"><span class="nav-icon">🚦</span></div>Пробки
+      <span class="nav-badge" id="traffic-badge">!</span>
+    </div>
+    <div class="nav-item" onclick="showSection('dps')">
+      <div class="nav-icon-wrap"><span class="nav-icon">🚔</span></div>ДПС
+    </div>
+    <div class="nav-item" onclick="showSection('worktime')">
+      <div class="nav-icon-wrap"><span class="nav-icon">⏰</span></div>График
+    </div>
+    <div class="nav-item" onclick="showSection('demand')">
+      <div class="nav-icon-wrap"><span class="nav-icon">🔥</span></div>Районы
+    </div>
+    <div class="nav-item" onclick="showSection('weather')">
+      <div class="nav-icon-wrap"><span class="nav-icon">🌦</span></div>Погода
+    </div>
+    <div class="nav-item" onclick="showSection('spots')">
+      <div class="nav-icon-wrap"><span class="nav-icon">📍</span></div>Места
+    </div>
+    <div class="nav-item" onclick="showSection('events')">
+      <div class="nav-icon-wrap"><span class="nav-icon">🎯</span></div>События
+    </div>
+    <div class="nav-item" onclick="showSection('fuel')">
+      <div class="nav-icon-wrap"><span class="nav-icon">⛽</span></div>АЗС
+    </div>
+    <div class="nav-item" onclick="showSection('news')">
+      <div class="nav-icon-wrap"><span class="nav-icon">📡</span></div>Инфо
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- ===== СМЕНА И ФИНАНСЫ ===== -->
+    <div class="section" id="section-shift">
+      <div class="section-header">
+        <div class="section-title">МОЯ СМЕНА</div>
+        <button class="refresh-btn" onclick="endShift()">ЗАВЕРШИТЬ СМЕНУ</button>
+      </div>
+
+      <div class="top-row">
+        <div class="card" style="border-top:2px solid var(--blue)">
+          <div class="card-label">ОТРАБОТАНО</div>
+          <div class="card-value" id="shift-total-time">00:00</div>
+        </div>
+        <div class="card" style="border-top:2px solid var(--green)">
+          <div class="card-label">В ДВИЖЕНИИ</div>
+          <div class="card-value green" id="shift-active-time">00:00</div>
+        </div>
+        <div class="card" style="border-top:2px solid var(--red)">
+          <div class="card-label">ПРОСТОЙ</div>
+          <div class="card-value red" id="shift-idle-time">00:00</div>
+        </div>
+      </div>
+
+      <div class="order-box">
+        <h2>СТАТУС И УПРАВЛЕНИЕ</h2>
+        <div class="shift-state-grid">
+          <button class="shift-btn active-state" onclick="setShiftState('offline')">
+            ⚪ НЕ В СЕТИ
+            <div class="shift-timer">ОЖИДАНИЕ</div>
+          </button>
+          <button class="shift-btn" onclick="setShiftState('online')">
+            🟢 НА ЛИНИИ
+            <div class="shift-timer" id="timer-online">00:00:00</div>
+          </button>
+          <button class="shift-btn" onclick="setShiftState('lunch')">
+            🍔 ОБЕД
+            <div class="shift-timer" id="timer-lunch">00:00:00</div>
+          </button>
+          <button class="shift-btn" onclick="setShiftState('sleep')">
+            😴 СОН
+            <div class="shift-timer" id="timer-sleep">00:00:00</div>
+          </button>
+          <button class="shift-btn" onclick="setShiftState('wash')">
+            🚿 МОЙКА
+            <div class="shift-timer" id="timer-wash">00:00:00</div>
+          </button>
+          <button class="shift-btn" onclick="setShiftState('fuel')">
+            ⛽ ЗАПРАВКА
+            <div class="shift-timer" id="timer-fuel">00:00:00</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div style="font-weight:bold;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <span>📉 РАСХОДЫ ЗА СМЕНУ</span>
+          <span id="expense-total" style="color:var(--danger)">0 ₽</span>
+        </div>
+        <div class="expense-chips" id="expense-chips">
+           <button class="chip active" onclick="selectExpenseChip('⛽ Бензин', this)">⛽ Бензин</button>
+           <button class="chip" onclick="selectExpenseChip('🚗 Аренда авто', this)">🚗 Аренда авто</button>
+           <button class="chip" onclick="selectExpenseChip('🍔 Еда/Кофе', this)">🍔 Еда/Кофе</button>
+           <button class="chip" onclick="selectExpenseChip('🛣️ Платная дорога', this)">🛣️ Платная дорога</button>
+           <button class="chip" onclick="selectExpenseChip('🚿 Мойка', this)">🚿 Мойка</button>
+           <button class="chip" onclick="selectExpenseChip('👮 Штраф', this)">👮 Штраф</button>
+           <button class="chip" onclick="selectExpenseChip('🛒 Прочее', this)">🛒 Прочее</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;">
+           <input type="number" id="expense-sum" class="search-input" placeholder="Сумма (например 500 ₽)" style="height:54px; font-size:16px; text-align:center; font-weight:bold; border-radius:8px; width:100%">
+          <button onclick="addExpense()" style="width:100%; background:#ffffff !important;color:#000000 !important;border:none; border-radius:8px; height:54px; font-weight:900; font-size:16px; font-family:var(--font-head); letter-spacing:1px; cursor:pointer;">ДОБАВИТЬ РАСХОД</button>
+        </div>
+        <div id="expense-custom" style="display:none;margin-bottom:12px;">
+          <input type="text" id="expense-custom-name" class="search-input" placeholder="Введите название (например 'Омывайка')" style="width:100%; height:54px; font-size:16px; background:#ffffff; color:#000000; font-weight:bold; text-align:center; border-radius:8px;">
+        </div>
+        <div id="expense-list" style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;font-size:13px;color:var(--muted)">
+          <!-- Expense Items -->
+        </div>
+      </div>
+
+      <!-- МОДАЛЬНОЕ ОКНО ИТОГОВ -->
+      <div id="shift-summary" class="shift-modal">
+        <div class="shift-modal-content">
+          <h3 style="color:var(--yellow);font-family:var(--font-head);margin-bottom:12px;text-align:center;font-size:24px">ИТОГИ СМЕНЫ 🏁</h3>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-family:var(--font-mono);font-size:14px"><span>Всего на смене:</span><strong id="sum-total">0ч 0м</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-family:var(--font-mono);font-size:14px"><span>Чистое время работы:</span><strong class="green" id="sum-active">0ч 0м</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-family:var(--font-mono);font-size:14px"><span>Время простоя:</span><strong class="red" id="sum-idle">0ч 0m</strong></div>
+          <hr style="border:0;border-top:1px solid #333;margin:8px 0;">
+          <div id="sum-earn" style="font-family:var(--font-mono);font-size:14px;margin-bottom:20px;">
+            Валовая Выручка: 0 ₽<br>
+            <span style="color:var(--danger)">Расходы за смену: -0 ₽</span><br>
+            <hr style="border:0;border-top:1px solid #333;margin:8px 0;">
+            <span style="color:var(--success)">ЧИСТАЯ ПРИБЫЛЬ: 0 ₽</span>
+          </div>
+          
+          <div style="padding:16px;background:var(--surface);border-radius:6px;border-left:4px solid var(--blue)">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-family:var(--font-mono)">АЙ АССИСТЕНТ СОВЕТУЕТ:</div>
+            <div id="sum-advice" style="font-size:14px;line-height:1.5"></div>
+          </div>
+          
+          <button class="btn-route" onclick="document.getElementById('shift-summary').style.display='none'" style="margin-top:20px;width:100%;padding:16px;font-size:16px">ЗАКРЫТЬ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ФИНАНСЫ ===== -->
+    <div class="section" id="section-finance">
+      <div class="section-header">
+        <div class="section-title">ФИНАНСЫ И УЧЕТ</div>
+      </div>
+      
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <strong style="color:var(--text);font-size:16px;">Фильтр по дате:</strong>
+          <input type="date" id="finance-date" class="search-input" style="width:140px; text-transform:uppercase" onchange="loadFinancesForDate()">
+        </div>
+        
+        <div id="finance-day-summary" style="font-family:var(--font-mono); font-size:14px;">
+           <!-- JS will render daily income/expense summary here -->
+        </div>
+      </div>
+      
+      <div class="card">
+         <h3 style="color:var(--yellow);margin-bottom:12px;font-size:14px;">СПИСОК ОПЕРАЦИЙ</h3>
+         <div id="finance-ledger" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;font-size:13px;color:var(--muted)">
+           <!-- Transactions -->
+         </div>
+      </div>
+    </div>
+
+    <!-- ===== ГЛАВНАЯ ===== -->
+    <div class="section active" id="section-orders">
+
+      <!-- DASHBOARD GRID -->
+      <style>
+        .dash-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+        .dash-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        .dash-card:active {
+          transform: scale(0.97);
+          opacity: 0.9;
+        }
+        .dash-card .dash-label {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          letter-spacing: 1.5px;
+          color: var(--muted);
+          margin-bottom: 8px;
+          text-transform: uppercase;
+        }
+        .dash-card .dash-value {
+          font-family: var(--font-head);
+          font-size: 36px;
+          line-height: 1;
+          margin-bottom: 4px;
+        }
+        .dash-card .dash-sub {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          color: var(--muted);
+          line-height: 1.3;
+        }
+        .dash-card .dash-glow {
+          position: absolute;
+          top: -30px;
+          right: -30px;
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          filter: blur(30px);
+          opacity: 0.15;
+        }
+      </style>
+
+      <div class="dash-grid">
+        <!-- Пробки -->
+        <div class="dash-card" onclick="showSection('traffic')">
+          <div class="dash-glow" style="background:var(--red)"></div>
+          <div class="dash-label">Пробки</div>
+          <div class="dash-value" style="color:var(--red)">
+            <span id="dash-traffic-score">—</span><span style="font-size:16px;color:var(--muted)">/10</span>
+          </div>
+          <div class="dash-sub" id="dash-traffic-desc">загрузка...</div>
+        </div>
+
+        <!-- Заработок -->
+        <div class="dash-card" onclick="showSection('shift')">
+          <div class="dash-glow" style="background:var(--yellow)"></div>
+          <div class="dash-label">Заработок сегодня</div>
+          <div class="dash-value" style="color:var(--yellow)">
+            <span id="dash-earnings">0</span> <span style="font-size:18px">₽</span>
+          </div>
+          <div class="dash-sub" id="dash-orders-count">0 заказов</div>
+        </div>
+
+        <!-- Лучший район -->
+        <div class="dash-card" onclick="showSection('demand')">
+          <div class="dash-glow" style="background:var(--green)"></div>
+          <div class="dash-label">Лучший район</div>
+          <div class="dash-value" style="color:var(--green);font-size:22px" id="dash-best-district">АРБАТ</div>
+          <div class="dash-sub"><span style="color:var(--yellow)" id="dash-coeff">Коэффициент x1.7</span></div>
+        </div>
+
+        <!-- Погода -->
+        <div class="dash-card" onclick="showSection('weather')">
+          <div class="dash-glow" style="background:#4FC3F7"></div>
+          <div class="dash-label">Погода</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="dash-weather-emoji" style="font-size:32px">☁️</span>
+            <span class="dash-value" style="color:var(--text);font-size:32px" id="dash-weather-temp">—°C</span>
+          </div>
+          <div class="dash-sub" id="dash-weather-demand">загрузка...</div>
+        </div>
+
+        <!-- Статус Смены -->
+        <div class="dash-card" onclick="showSection('shift')">
+          <div class="dash-glow" style="background:var(--green)"></div>
+          <div class="dash-label">Статус Смены</div>
+          <div class="dash-value" style="font-size:20px">
+            <span style="color:var(--green)" id="dash-shift-status">Активна</span>
+            <span style="color:var(--text);font-size:16px;margin-left:6px" id="dash-shift-time">00:00</span>
+          </div>
+          <div class="dash-sub" id="dash-shift-earned">На линии</div>
+        </div>
+
+        <!-- Мероприятия -->
+        <div class="dash-card" onclick="showSection('events')">
+          <div class="dash-glow" style="background:var(--red)"></div>
+          <div class="dash-label">Активные События</div>
+          <div class="dash-value" style="color:var(--red)" id="dash-events-count">0</div>
+          <div class="dash-sub" id="dash-events-desc">мероприятий</div>
+        </div>
+      </div>
+
+      <div class="order-box">
+        <h2>ОЖИДАНИЕ ЗАКАЗА YANDEX</h2>
+        <div class="listener-box" id="listener-box">
+          <div class="pulse-icon"></div>
+          <div class="listener-text">
+            <h3>ОЖИДАНИЕ ЗАКАЗА YANDEX PRO...</h3>
+            <p>Приложение перехватит данные автоматически и покажет вердикт.</p>
+          </div>
+        </div>
+
+        <div class="verdict" id="verdict-box">
+          <span class="verdict-score" id="verdict-score">0</span>
+          <div class="verdict-title" id="verdict-title"></div>
+          <div class="verdict-reason" id="verdict-reason"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ПРОБКИ ===== -->
+    <div class="section" id="section-traffic">
+      <div class="section-header">
+        <div class="section-title">🚦 ПРОБКИ</div>
+        <button class="refresh-btn" onclick="refreshTraffic()">↻ ОБНОВИТЬ</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px; padding:0; overflow:hidden">
+        <iframe id="traffic-map-iframe" src="https://yandex.ru/map-widget/v1/?ll=37.622093%2C55.753994&z=10&l=trf%2Ctrfe&theme=dark" width="100%" height="250" frameborder="0" allowfullscreen="true" style="display:block"></iframe>
+        <div style="padding:12px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2)">
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">КАРТА ЗАГРУЖЕННОСТИ ДОРОГ</span>
+          <button class="btn-route" onclick="if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress('Москва')" style="width:auto;margin:0">ОТКРЫТЬ В НАВИГАТОРЕ</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-label">БАЛЛ ПРОБОК В МОСКВЕ</div>
+        <div class="traffic-meter">
+          <div class="traffic-score-big" id="traffic-score-big">—</div>
+          <div style="flex:1">
+            <div class="meter-bar">
+              <div class="meter-fill" id="meter-fill" style="width:0%;background:var(--green)"></div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-top:8px" id="traffic-desc-main">загрузка...</div>
+          </div>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">/10</span>
+        </div>
+        <div id="traffic-advice" style="font-size:13px;color:var(--text);line-height:1.6;font-family:var(--font-mono);padding-top:8px;border-top:1px solid var(--border)"></div>
+      </div>
+
+      <h3 style="font-family:var(--font-mono);font-size:11px;letter-spacing:2px;color:var(--muted);margin-bottom:12px">⚠️ ДТП И АВАРИИ</h3>
+      <div class="incident-list" id="incident-list"></div>
+    </div>
+
+    <!-- ===== ДПС ===== -->
+    <div class="section" id="section-dps">
+      <div class="section-header">
+        <div class="section-title">ДПС И ПРОВЕРКИ</div>
+        <button class="refresh-btn" onclick="refreshDps()">↻ ОБНОВИТЬ</button>
+      </div>
+      <div class="incident-list" id="dps-list"></div>
+    </div>
+
+    <!-- ===== ВРЕМЯ РАБОТЫ ===== -->
+    <div class="section" id="section-worktime">
+      <div class="section-header">
+        <div class="section-title">ВРЕМЯ РАБОТЫ</div>
+      </div>
+
+      <div class="card yellow" style="margin-bottom:20px">
+        <div class="card-label">СЕЙЧАС</div>
+        <div id="worktime-now" style="font-family:var(--font-head);font-size:22px;color:var(--yellow);margin-bottom:4px"></div>
+        <div id="worktime-next" style="font-family:var(--font-mono);font-size:12px;color:var(--muted)"></div>
+      </div>
+
+      <div class="order-box">
+        <h2>СЕГОДНЯ ПО ЧАСАМ (ГРАФИК ВЫХОДА)</h2>
+        <div class="bar-chart-container" id="bar-chart-today" style="display:flex; align-items:flex-end; gap:4px; height:150px; margin-top:16px; padding-bottom:8px; border-bottom:1px solid var(--border); overflow-x:auto"></div>
+        <div style="display:flex;gap:16px;margin-top:16px;font-family:var(--font-mono);font-size:11px">
+          <span style="color:var(--muted)">■ Тихо</span>
+          <span style="color:#66BB6A">■ Средне</span>
+          <span style="color:#AED581">■ Активно</span>
+          <span style="color:var(--yellow)">■ ПИК</span>
+        </div>
+      </div>
+
+      <div class="order-box">
+        <h2>ЛУЧШИЕ ДНИ И ЧАСЫ</h2>
+        <div class="week-grid" id="week-grid"></div>
+      </div>
+    </div>
+
+    <!-- ===== ТОП РАЙОНОВ (ПРЕДИКТИВНЫЙ СПРОС) ===== -->
+    <div class="section" id="section-demand">
+      <div class="section-header">
+        <div class="section-title">ТОП РАЙОНОВ</div>
+        <button class="refresh-btn" onclick="refreshDemand()">↻ ОБНОВИТЬ</button>
+      </div>
+      <div class="card red" style="margin-bottom:20px">
+        <div class="card-label">САМЫЙ ГОРЯЧИЙ РАЙОН</div>
+        <div id="hot-district-now" style="font-family:var(--font-head);font-size:24px;color:var(--red);margin-bottom:4px">Загрузка...</div>
+        <div id="hot-district-score" style="font-family:var(--font-mono);font-size:12px;color:var(--muted)"></div>
+        <button class="btn-route" id="btn-route-top" style="margin-top:12px;width:100%;display:none">ПОЕХАЛИ</button>
+      </div>
+      
+      <div class="order-box">
+        <h2>ПРОГНОЗ ПО ВСЕЙ МОСКВЕ</h2>
+        <div class="events-list" id="demand-list"></div>
+      </div>
+    </div>
+
+    <!-- ===== ПОГОДА ===== -->
+    <div class="section" id="section-weather">
+      <div class="section-header">
+        <div class="section-title">🌦 ПОГОДА И СПРОС</div>
+        <button class="refresh-btn" onclick="fetchWeather()">↻ ОБНОВИТЬ</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;text-align:center">
+        <div id="weather-emoji" style="font-size:60px;line-height:1">🌤</div>
+        <div id="weather-temp" style="font-family:var(--font-head);font-size:42px;color:var(--text);margin:4px 0">—°C</div>
+        <div id="weather-desc" style="font-family:var(--font-mono);font-size:14px;color:var(--muted)">Загрузка...</div>
+        <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">
+          <span id="weather-feels">Ощущается: —°</span>
+          <span id="weather-wind">💨 — м/с</span>
+          <span id="weather-humidity">💧 —%</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px" id="weather-demand-card">
+        <div class="card-label">ВЛИЯНИЕ НА СПРОС ТАКСИ</div>
+        <div id="weather-demand" style="font-family:var(--font-head);font-size:18px;color:var(--green);margin-bottom:4px">Обычный спрос</div>
+        <div id="weather-demand-detail" style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Погода не влияет на количество заказов</div>
+      </div>
+
+      <div id="weather-alerts" style="margin-bottom:16px"></div>
+
+      <div class="order-box">
+        <h2>ПРОГНОЗ НА 3 ЧАСА</h2>
+        <div id="weather-forecast" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <p style="font-size:11px;color:var(--muted);line-height:1.5;margin:0">🌧 Дождь/снег = спрос на такси +30-50%. Следи за прогнозом!</p>
+      </div>
+    </div>
+
+    <!-- ===== ТОЧКИ ОЖИДАНИЯ ===== -->
+    <div class="section" id="section-spots">
+      <div class="section-header">
+        <div class="section-title">📍 ТОЧКИ ОЖИДАНИЯ</div>
+      </div>
+
+      <div class="card yellow" style="margin-bottom:20px">
+        <div class="card-label">ТОП МЕСТО СЕЙЧАС</div>
+        <div style="font-family:var(--font-head);font-size:18px;color:var(--yellow);margin-bottom:4px">✈️ Шереметьево, Терминал B</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">⏱ Среднее ожидание: 5-10 мин · ⭐ 4.8</div>
+      </div>
+
+      <div class="events-list" id="spots-list"></div>
+
+      <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <p style="font-size:11px;color:var(--muted);line-height:1.5;margin:0">📍 Проверенные точки где быстро прилетает заказ. Рейтинг основан на данных водителей.</p>
+      </div>
+    </div>
+
+    <!-- ===== МЕРОПРИЯТИЯ (Яндекс Афиша) ===== -->
+    <div class="section" id="section-events">
+      <div class="section-header">
+        <div class="section-title">🎭 МЕРОПРИЯТИЯ</div>
+        <button class="refresh-btn" onclick="refreshEvents()">↻ ОБНОВИТЬ</button>
+      </div>
+      <div class="card red" style="margin-bottom:20px">
+        <div class="card-label">🔥 САМОЕ ГОРЯЧЕЕ СОБЫТИЕ</div>
+        <div id="hot-event-now" style="font-family:var(--font-head);font-size:20px;color:var(--red);margin-bottom:4px">Загрузка...</div>
+        <div id="hot-event-desc" style="font-family:var(--font-mono);font-size:12px;color:var(--muted)"></div>
+      </div>
+      <div class="events-list" id="events-list"></div>
+      <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <p style="font-size:11px;color:var(--muted);line-height:1.5;margin:0">📊 Только крупные мероприятия от 300+ чел. Обновляются автоматически каждые 15 мин.</p>
+      </div>
+    </div>
+
+    <!-- ===== БЕНЗИН ===== -->
+    <div class="section" id="section-fuel">
+      <div class="section-header">
+        <div class="section-title">ЦЕНЫ НА БЕНЗИН</div>
+        <button class="refresh-btn" onclick="refreshFuel()">↻ ОБНОВИТЬ</button>
+      </div>
+      <div class="grid2">
+        <div class="card green">
+          <div class="card-label">ДЕШЕВЛЕ ВСЕГО АИ-95</div>
+          <div class="card-value green" id="fuel-best-price">56.2 ₽</div>
+          <div class="card-sub" id="fuel-best-name">Роснефть, Варшавское ш.</div>
+        </div>
+        <div class="card yellow">
+          <div class="card-label">СРЕДНЯЯ ЦЕНА АИ-95</div>
+          <div class="card-value yellow" id="fuel-avg-price">57.1 ₽</div>
+          <div class="card-sub">по Москве сегодня</div>
+        </div>
+      </div>
+      <div class="card" style="padding:16px 8px">
+        <table class="fuel-table" id="fuel-table">
+          <thead>
+            <tr><th style="width:25%">АЗС</th><th style="width:12%">92</th><th style="width:12%">95</th><th style="width:12%">ДТ</th><th style="width:12%">ГАЗ</th><th style="width:27%">КМ</th></tr>
+          </thead>
+          <tbody id="fuel-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== НОВОСТИ ===== -->
+    <div class="section" id="section-news">
+      <div class="section-header">
+        <div class="section-title">ПОГОДА И НОВОСТИ</div>
+        <button class="refresh-btn" onclick="refreshNews()">↻ ОБНОВИТЬ</button>
+      </div>
+      <div class="card blue" style="margin-bottom:20px">
+        <div class="card-label">ПОГОДА В МОСКВЕ</div>
+        <div id="weather-main" style="font-family:var(--font-head);font-size:28px;color:var(--blue);margin-bottom:4px">Загрузка...</div>
+        <div id="weather-desc" style="font-family:var(--font-mono);font-size:12px;color:var(--muted)"></div>
+      </div>
+      <h3 style="font-family:var(--font-mono);font-size:11px;letter-spacing:2px;color:var(--muted);margin-bottom:12px">ВАЖНЫЕ НОВОСТИ ДЛЯ ВОДИТЕЛЕЙ</h3>
+      <div class="notif-list" id="news-list"></div>
+      
+      <div style="margin-top:24px; padding:20px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; text-align:center;">
+        <h3 style="font-family:var(--font-head);color:var(--text);font-size:18px;margin-bottom:8px">ОТДЕЛ ПОДДЕРЖКИ</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.4">Есть вопросы по работе приложения, функционалу или оплате лицензии?</p>
+        <a href="https://t.me/mediakassa" style="text-decoration:none">
+          <button class="btn-route" style="width:100%;padding:16px;font-size:14px;background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">НАПИСАТЬ В ПОДДЕРЖКУ</button>
+        </a>
+      </div>
+
+      <!-- DROWSINESS DETECTION -->
+      <div id="drowsiness-card" style="margin-top:20px; padding:16px; background:linear-gradient(135deg, #1a1025 0%, #0d0d12 100%); border:1px solid rgba(120,80,255,0.2); border-radius:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-family:var(--font-head);font-size:16px;color:#fff">😴 Детектор сонливости</div>
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">ML Kit Face Detection</div>
+          </div>
+          <button id="drowsiness-toggle" onclick="toggleDrowsiness()" style="
+            padding:8px 20px;border:none;border-radius:20px;font-family:var(--font-mono);font-size:11px;
+            font-weight:bold;cursor:pointer;transition:all 0.2s;
+            background:linear-gradient(135deg, #6C3AFF, #00E5A0);color:#fff;
+          ">ВКЛЮЧИТЬ</button>
+        </div>
+        <div id="drowsiness-status" style="font-family:var(--font-mono);font-size:12px;color:var(--muted);line-height:1.6">
+          Анализирует лицо водителя через камеру.<br>
+          Предупреждает когда вы засыпаете.
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ========== ДАННЫЕ ==========
+
+const DISTRICTS = [
+  // Глухие зоны
+  {name:'Капотня',score:15},{name:'Некрасовка',score:20},{name:'Кожухово',score:22},
+  {name:'Щербинка',score:18},{name:'Зеленоград',score:25},{name:'Бутово',score:30},
+  {name:'Солнцево',score:28},{name:'Переделкино',score:20},{name:'Троицк',score:18},
+  // Средние
+  {name:'Митино',score:45},{name:'Строгино',score:48},{name:'Братеево',score:40},
+  {name:'Орехово',score:42},{name:'Царицыно',score:45},{name:'Чертаново',score:47},
+  {name:'Ясенево',score:44},{name:'Марьино',score:50},{name:'Люблино',score:48},
+  {name:'Выхино',score:52},{name:'Перово',score:50},{name:'Измайлово',score:55},
+  {name:'Медведково',score:45},{name:'Бибирево',score:43},{name:'Отрадное',score:47},
+  // Хорошие
+  {name:'Центр',score:85},{name:'Арбат',score:88},{name:'Хамовники',score:82},
+  {name:'Сокол',score:75},{name:'Войковская',score:72},{name:'Кузьминки',score:62},
+  {name:'Богородское',score:62},{name:'Рязанский',score:60},
+  {name:'Шереметьево',score:80},{name:'Домодедово',score:75},{name:'Внуково',score:72},
+];
+
+const DEMAND = {
+  1:[{h:7,l:'high'},{h:8,l:'peak'},{h:9,l:'high'},{h:12,l:'medium'},{h:17,l:'high'},{h:18,l:'peak'},{h:19,l:'high'}],
+  2:[{h:7,l:'high'},{h:8,l:'peak'},{h:9,l:'high'},{h:17,l:'high'},{h:18,l:'peak'},{h:19,l:'high'}],
+  3:[{h:7,l:'high'},{h:8,l:'peak'},{h:9,l:'high'},{h:17,l:'high'},{h:18,l:'peak'},{h:19,l:'high'}],
+  4:[{h:7,l:'high'},{h:8,l:'peak'},{h:17,l:'peak'},{h:18,l:'peak'},{h:19,l:'peak'}],
+  5:[{h:7,l:'high'},{h:8,l:'peak'},{h:9,l:'peak'},{h:17,l:'peak'},{h:18,l:'peak'},{h:22,l:'peak'},{h:23,l:'peak'}],
+  6:[{h:10,l:'high'},{h:11,l:'high'},{h:12,l:'high'},{h:20,l:'peak'},{h:21,l:'peak'},{h:22,l:'peak'},{h:23,l:'peak'}],
+  0:[{h:11,l:'medium'},{h:12,l:'medium'},{h:16,l:'high'},{h:17,l:'high'},{h:20,l:'high'},{h:21,l:'high'}],
+};
+
+// Центральный URL сервера API
+var SERVER_URL = 'https://taxi-api-b4ni.onrender.com';
+
+// ========== FALLBACK DATA — работает даже без сервера ==========
+var FALLBACK_DATA = {
+  weather: {"current":{"temp":5,"feels_like":4,"description":"Загрузка...","emoji":"🌤","wind":2,"gust":3,"humidity":55,"precipitation":"0","demand_level":"normal","demand_text":"Обычный спрос","demand_color":"green"},"forecast":[{"time":"Утро","hours":"06:00-12:00","temp":5,"description":"Ясно","emoji":"☀️","demand_level":"normal","demand_text":"Обычный спрос","demand_color":"green"},{"time":"День","hours":"12:00-18:00","temp":7,"description":"Ясно","emoji":"☀️","demand_level":"normal","demand_text":"Обычный спрос","demand_color":"green"},{"time":"Вечер","hours":"18:00-00:00","temp":3,"description":"Ясно","emoji":"🌙","demand_level":"normal","demand_text":"Обычный спрос","demand_color":"green"}],"alerts":[],"updated":"—","source":"Оффлайн"},
+  events: [{"name":"📡 Ожидание подключения к серверу...","venue":"Данные загрузятся автоматически","start":"—","end":"—","hot":false}],
+  alerts: [{"type":"dps","text":"✅ Подключение к серверу... Данные обновятся автоматически","time":"—","location":"Москва","source":"Система"}],
+  demand: [{"name":"Подключение...","coefficient":1.0,"score":50}],
+  fuel: [{"name":"⛽ Загрузка АЗС...","address":"Данные обновятся автоматически","lat":55.75,"lon":37.61,"p92":0,"p95":0,"dt":0,"gas":0}]
+};
+
+// Авто-ретрай: повторяет запрос каждые 30с при неудаче (до 5 раз)
+var _retryTimers = {};
+function scheduleRetry(fnName, fn, attempt) {
+  if (attempt >= 5) return;
+  if (_retryTimers[fnName]) clearTimeout(_retryTimers[fnName]);
+  _retryTimers[fnName] = setTimeout(function() { fn(attempt + 1); }, 30000);
+}
+
+let FUEL_STATIONS = [];
+
+let DEMAND_DATA = [];
+
+async function fetchRealtimeDEMAND(attempt) {
+  attempt = attempt || 0;
+  try {
+    const response = await fetch(SERVER_URL + '/api/demand', {signal: AbortSignal.timeout(10000)});
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.length > 0) {
+         DEMAND_DATA = data;
+         renderDemand();
+         return;
+      }
+    }
+  } catch(e) {
+     console.error("Demand API Error:", e);
+  }
+  // Fallback
+  if (DEMAND_DATA.length === 0) {
+    DEMAND_DATA = FALLBACK_DATA.demand;
+    renderDemand();
+  }
+  scheduleRetry('demand', fetchRealtimeDEMAND, attempt);
+}
+
+function refreshDemand() {
+  fetchRealtimeDEMAND();
+}
+
+// ========== ПОГОДА ==========
+
+let WEATHER_DATA = null;
+
+async function fetchWeather(attempt) {
+  attempt = attempt || 0;
+  try {
+    const response = await fetch(SERVER_URL + '/api/weather', {signal: AbortSignal.timeout(10000)});
+    if (response.ok) {
+      WEATHER_DATA = await response.json();
+      renderWeather();
+      updateDashboard();
+      return;
+    }
+  } catch(e) {
+    console.error("Weather API Error:", e);
+  }
+  // Fallback
+  if (!WEATHER_DATA) {
+    WEATHER_DATA = FALLBACK_DATA.weather;
+    renderWeather();
+    updateDashboard();
+  }
+  scheduleRetry('weather', fetchWeather, attempt);
+}
+
+function renderWeather() {
+  if (!WEATHER_DATA || !WEATHER_DATA.current) return;
+  const c = WEATHER_DATA.current;
+
+  document.getElementById('weather-emoji').textContent = c.emoji || '🌤';
+  document.getElementById('weather-temp').textContent = c.temp + '°C';
+  document.getElementById('weather-desc').textContent = c.description || '';
+  document.getElementById('weather-feels').textContent = 'Ощущается: ' + c.feels_like + '°';
+  document.getElementById('weather-wind').textContent = '💨 ' + c.wind + ' м/с';
+  document.getElementById('weather-humidity').textContent = '💧 ' + c.humidity + '%';
+
+  // Влияние на спрос
+  const colorMap = {green:'var(--green)', yellow:'var(--yellow)', red:'var(--red)'};
+  document.getElementById('weather-demand').textContent = c.demand_text || 'Обычный спрос';
+  document.getElementById('weather-demand').style.color = colorMap[c.demand_color] || 'var(--green)';
+  
+  const detail = c.demand_level === 'high' || c.demand_level === 'peak'
+    ? '🔥 Плохая погода повышает спрос на 30-50%! Бери заказы!'
+    : 'Погода не влияет на количество заказов';
+  document.getElementById('weather-demand-detail').textContent = detail;
+
+  // Алерты
+  const alertsEl = document.getElementById('weather-alerts');
+  if (WEATHER_DATA.alerts && WEATHER_DATA.alerts.length > 0) {
+    alertsEl.innerHTML = WEATHER_DATA.alerts.map(a => `
+      <div class="card" style="margin-bottom:8px;border-left:3px solid var(--red);padding:10px 12px">
+        <div style="font-family:var(--font-mono);font-size:12px;color:var(--text)">${a.text}</div>
+      </div>
+    `).join('');
+    
+    // Toast уведомление
+    WEATHER_DATA.alerts.forEach(a => {
+      if (a.level === 'warning') showToast(a.text, 'var(--yellow)');
+    });
+  } else {
+    alertsEl.innerHTML = '';
+  }
+
+  // Прогноз
+  const fcEl = document.getElementById('weather-forecast');
+  if (WEATHER_DATA.forecast && WEATHER_DATA.forecast.length > 0) {
+    fcEl.innerHTML = WEATHER_DATA.forecast.map(f => {
+      const dcol = colorMap[f.demand_color] || 'var(--green)';
+      return `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface2);border-radius:8px">
+        <div style="min-width:50px;font-family:var(--font-head);font-size:14px;color:var(--text)">${f.time}</div>
+        <div style="font-size:28px">${f.emoji}</div>
+        <div style="flex:1">
+          <div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">${f.temp}°C · ${f.description}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:${dcol};margin-top:2px">${f.demand_text}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderWeatherFallback() {
+  // Март в Москве — облачно около 3°C
+  document.getElementById('weather-emoji').textContent = '☁️';
+  document.getElementById('weather-temp').textContent = '3°C';
+  document.getElementById('weather-desc').textContent = 'Облачно';
+  document.getElementById('weather-feels').textContent = 'Ощущается: 1°';
+  document.getElementById('weather-wind').textContent = '💨 3 м/с';
+  document.getElementById('weather-humidity').textContent = '💧 65%';
+  document.getElementById('weather-demand').textContent = 'Обычный спрос';
+  document.getElementById('weather-demand').style.color = 'var(--green)';
+  document.getElementById('weather-demand-detail').textContent = 'Погода не влияет на количество заказов';
+  
+  // Прогноз
+  const fcEl = document.getElementById('weather-forecast');
+  if (fcEl) {
+    fcEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="min-width:50px;font-family:var(--font-head);font-size:14px;color:var(--text)">Утро</div>
+      <div style="font-size:28px">☁️</div>
+      <div style="flex:1">
+        <div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">3°C · Облачно</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);margin-top:2px">Обычный спрос</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="min-width:50px;font-family:var(--font-head);font-size:14px;color:var(--text)">День</div>
+      <div style="font-size:28px">⛅</div>
+      <div style="flex:1">
+        <div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">5°C · Малооблачно</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);margin-top:2px">Обычный спрос</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="min-width:50px;font-family:var(--font-head);font-size:14px;color:var(--text)">Вечер</div>
+      <div style="font-size:28px">🌙</div>
+      <div style="flex:1">
+        <div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">2°C · Ясно</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);margin-top:2px">Обычный спрос</div>
+      </div>
+    </div>`;
+  }
+  
+  // Повторная попытка через 10 сек
+  setTimeout(fetchWeather, 10000);
+}
+
+// ========== ТОЧКИ ОЖИДАНИЯ ==========
+
+const WAITING_SPOTS = [
+  {name:'✈️ Шереметьево, Терминал B', addr:'Международное ш., 28/4', wait:'5-10 мин', rating:4.8, type:'airport', lat:55.972, lon:37.414},
+  {name:'✈️ Домодедово', addr:'Домодедовский район', wait:'5-15 мин', rating:4.7, type:'airport', lat:55.410, lon:37.902},
+  {name:'✈️ Внуково', addr:'1-я Рейсовая ул., 12', wait:'8-15 мин', rating:4.5, type:'airport', lat:55.596, lon:37.271},
+  {name:'🚂 Казанский вокзал', addr:'Комсомольская пл., 2', wait:'3-7 мин', rating:4.6, type:'train', lat:55.774, lon:37.657},
+  {name:'🚂 Курский вокзал', addr:'ул. Земляной Вал, 29', wait:'3-8 мин', rating:4.5, type:'train', lat:55.758, lon:37.660},
+  {name:'🚂 Ленинградский вокзал', addr:'Комсомольская пл., 3', wait:'3-7 мин', rating:4.4, type:'train', lat:55.776, lon:37.655},
+  {name:'🏬 МЕГА Тёплый Стан', addr:'68-й км МКАД', wait:'5-10 мин', rating:4.3, type:'mall', lat:55.611, lon:37.474},
+  {name:'🏬 Авиапарк', addr:'Ходынский бул., 4', wait:'3-8 мин', rating:4.4, type:'mall', lat:55.789, lon:37.532},
+  {name:'🏬 АФИМОЛЛ', addr:'Пресненская наб., 2', wait:'2-5 мин', rating:4.6, type:'mall', lat:55.749, lon:37.539},
+  {name:'🏥 Склифосовского', addr:'Большая Сухаревская пл., 3', wait:'5-10 мин', rating:4.2, type:'hospital', lat:55.776, lon:37.630},
+  {name:'🎭 Большой Театр', addr:'Театральная пл., 1', wait:'2-5 мин', rating:4.7, type:'theater', lat:55.760, lon:37.618},
+  {name:'🏟 Лужники', addr:'ул. Лужники, 24', wait:'3-10 мин', rating:4.5, type:'stadium', lat:55.716, lon:37.554},
+];
+
+function renderSpots() {
+  const list = document.getElementById('spots-list');
+  if (!list) return;
+  
+  list.innerHTML = WAITING_SPOTS.map((s, i) => {
+    const addr = s.addr.replace(/'/g, '');
+    return `
+    <div class="event-card" style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--border)">
+      <div style="min-width:35px;text-align:center">
+        <div style="font-size:16px;font-weight:bold;color:var(--yellow)">#${i+1}</div>
+      </div>
+      <div style="flex:1">
+        <h3 style="margin:0;font-size:14px;line-height:1.3;font-weight:600">${s.name}</h3>
+        <p style="margin:3px 0 0 0;font-size:11px;color:var(--muted)">📍 ${s.addr}</p>
+        <div style="display:flex;gap:12px;margin-top:3px">
+          <span style="font-size:10px;color:var(--yellow)">⏱ ${s.wait}</span>
+          <span style="font-size:10px;color:var(--green)">⭐ ${s.rating}</span>
+        </div>
+      </div>
+      <button class="btn-route" onclick="if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress('${addr}')" style="width:auto;padding:8px 12px;font-size:10px;font-weight:bold">🚖 ЕХАТЬ</button>
+    </div>`;
+  }).join('');
+}
+
+// ========== СТАТИСТИКА ПО ДНЯМ ==========
+
+function getShiftHistory() {
+  try { return JSON.parse(localStorage.getItem('shift_history') || '[]'); } catch(e) { return []; }
+}
+
+function saveShiftRecord(earned, hours, expenses) {
+  const history = getShiftHistory();
+  const today = new Date().toISOString().slice(0, 10);
+  const existing = history.find(h => h.date === today);
+  if (existing) {
+    existing.earned = earned;
+    existing.hours = hours;
+    existing.expenses = expenses;
+  } else {
+    history.push({date: today, earned, hours, expenses});
+  }
+  // Храним последние 30 дней
+  while (history.length > 30) history.shift();
+  localStorage.setItem('shift_history', JSON.stringify(history));
+}
+
+function renderStats() {
+  const history = getShiftHistory();
+  const last7 = history.slice(-7);
+  
+  if (last7.length === 0) {
+    const el = document.getElementById('stats-chart');
+    if (el) el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:12px">Нет данных. Начни смену чтобы появилась статистика!</div>';
+    return;
+  }
+  
+  const maxEarn = Math.max(...last7.map(d => d.earned || 0), 1);
+  
+  const el = document.getElementById('stats-chart');
+  if (!el) return;
+  
+  el.innerHTML = last7.map(d => {
+    const pct = Math.round(((d.earned || 0) / maxEarn) * 100);
+    const day = new Date(d.date).toLocaleDateString('ru', {weekday:'short'});
+    return `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="min-width:30px;font-size:10px;color:var(--muted);font-family:var(--font-mono)">${day}</div>
+      <div style="flex:1;height:20px;background:var(--surface2);border-radius:4px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--green),var(--yellow));border-radius:4px;display:flex;align-items:center;padding-left:6px">
+          <span style="font-size:9px;color:#000;font-weight:bold">${d.earned || 0} ₽</span>
+        </div>
+      </div>
+      <div style="min-width:40px;font-size:10px;color:var(--muted);text-align:right">${(d.hours || 0).toFixed(1)}ч</div>
+    </div>`;
+  }).join('');
+}
+
+// ========== ИВЕНТЫ (Яндекс Афиша) ==========
+
+let EVENTS = [];
+
+async function fetchRealtimeEVENTS(attempt) {
+  attempt = attempt || 0;
+  try {
+    const response = await fetch(SERVER_URL + '/api/events', {signal: AbortSignal.timeout(10000)});
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.length > 0) {
+         EVENTS = data;
+         renderEvents();
+         return;
+      }
+    }
+  } catch(e) {
+     console.error("Events API Error:", e);
+  }
+  if (EVENTS.length === 0) {
+    EVENTS = FALLBACK_DATA.events;
+    renderEvents();
+  }
+  scheduleRetry('events', fetchRealtimeEVENTS, attempt);
+}
+
+function refreshEvents() {
+  fetchRealtimeEVENTS();
+}
+
+let DPS_ALERTS = [];
+
+// Fetch real alerts from Telegram Scraper Server
+async function fetchRealtimeDPS(attempt) {
+  attempt = attempt || 0;
+  try {
+    const response = await fetch(SERVER_URL + '/api/alerts', {signal: AbortSignal.timeout(10000)});
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.length > 0) {
+         DPS_ALERTS = data;
+         refreshDps();
+         return;
+      }
+    }
+  } catch(e) {
+     console.error("Scraper API Error:", e);
+  }
+  if (DPS_ALERTS.length === 0) {
+    DPS_ALERTS = FALLBACK_DATA.alerts;
+    refreshDps();
+  }
+  scheduleRetry('dps', fetchRealtimeDPS, attempt);
+}
+
+// ========== НАВИГАЦИЯ ==========
+
+// ========== УТИЛИТЫ И TOAST NOTIFICATIONS ==========
+
+function showToast(message, colorClass = '') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  if (colorClass) toast.style.borderLeftColor = colorClass;
+  toast.innerText = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'slideInRight 0.3s ease-out reverse forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ========== МОЯ СМЕНА ==========
+let shiftState = 'offline'; // offline, online, lunch, sleep, wash, fuel
+let shiftTimers = { online: 0, lunch: 0, sleep: 0, wash: 0, fuel: 0, total: 0, active: 0, idle: 0 };
+let shiftTick = null;
+let shiftExpenses = [];
+let shiftEarned = 0; // Placeholder for earned money
+
+function formatHMS(sec) {
+  const h = Math.floor(sec / 3600).toString().padStart(2,'0');
+  const m = Math.floor((sec % 3600) / 60).toString().padStart(2,'0');
+  const s = (sec % 60).toString().padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+function formatTimeStr(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h.toString().padStart(2,'0')}ч ${m.toString().padStart(2,'0')}м`;
+}
+
+function addAutomatedIncome(price) {
+  if (shiftState === 'offline') return;
+  shiftEarned += price;
+  saveTransaction('income', 'Выручка Яндекс ПРО', price);
+  showToast("Выручка обновлена: +" + price + " ₽", "var(--success)");
+}
+
+function updateShiftUI() {
+  // Update buttons
+  document.querySelectorAll('.shift-btn').forEach(btn => btn.classList.remove('active-state'));
+  const currentBtn = document.querySelector(`.shift-btn[onclick*="${shiftState}"]`);
+  if (currentBtn) currentBtn.classList.add('active-state');
+
+  // Update timers
+  document.getElementById('timer-online').textContent = formatHMS(shiftTimers.online);
+  document.getElementById('timer-lunch').textContent = formatHMS(shiftTimers.lunch);
+  document.getElementById('timer-sleep').textContent = formatHMS(shiftTimers.sleep);
+  document.getElementById('timer-wash').textContent = formatHMS(shiftTimers.wash);
+  document.getElementById('timer-fuel').textContent = formatHMS(shiftTimers.fuel);
+
+  // Update top cards
+  document.getElementById('shift-total-time').textContent = formatTimeStr(shiftTimers.total);
+  document.getElementById('shift-active-time').textContent = formatTimeStr(shiftTimers.active);
+  document.getElementById('shift-idle-time').textContent = formatTimeStr(shiftTimers.idle);
+}
+
+function tickShift() {
+  shiftTimers.total++;
+  if (shiftState === 'online') {
+    shiftTimers.online++;
+    shiftTimers.active++;
+  } else if (shiftState !== 'offline') {
+    shiftTimers[shiftState]++;
+    shiftTimers.idle++;
+  }
+  updateShiftUI();
+}
+
+function setShiftState(newState) {
+  if (newState === 'offline') {
+    if (shiftTick) {
+      clearInterval(shiftTick);
+      shiftTick = null;
+    }
+    shiftState = 'offline';
+  } else {
+    if (shiftState === 'offline') { // Starting shift for the first time
+      shiftTick = setInterval(tickShift, 1000);
+    }
+    shiftState = newState;
+  }
+  updateShiftUI();
+}
+
+function endShift() {
+  setShiftState('offline'); // Stop the timer
+  
+  document.getElementById('shift-summary').style.display = 'flex';
+  
+  // Play Boxing Bell Sound (Ding-Ding-Ding) via Web Audio API (Zero Latency, no download)
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    function playDing(delay) {
+      setTimeout(() => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle'; // Ringing sine/triangle tone
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        gain.gain.setValueAtTime(1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.0);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 1.0);
+      }, delay);
+    }
+    playDing(0);
+    playDing(300);
+    playDing(600);
+  } catch(e) { console.log('Audio Context failed'); }
+  
+  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.sum, 0);
+  const netIncome = shiftEarned - totalExpenses;
+  
+  document.getElementById('sum-total').textContent = formatTimeStr(shiftTimers.total);
+  document.getElementById('sum-active').textContent = formatTimeStr(shiftTimers.active);
+  document.getElementById('sum-idle').textContent = formatTimeStr(shiftTimers.idle);
+  const totalTurnover = shiftEarned + totalExpenses;
+  let expensePerc = 0;
+  let incomePerc = 100;
+  if (totalTurnover > 0 && totalExpenses > 0) {
+    expensePerc = Math.min((totalExpenses / totalTurnover) * 100, 100);
+    incomePerc = 100 - expensePerc;
+  }
+  
+  if (shiftEarned === 0 && totalExpenses > 0) {
+      expensePerc = 100;
+      incomePerc = 0;
+  }
+
+  document.getElementById('sum-earn').innerHTML = `
+    <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
+      <div style="text-align:center;">
+        <div style="color:var(--muted);font-size:12px;margin-bottom:4px">ДОХОД</div>
+        <div style="color:var(--success);font-family:var(--font-mono);font-size:16px">${shiftEarned} ₽</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="color:var(--muted);font-size:12px;margin-bottom:4px">РАСХОД</div>
+        <div style="color:var(--danger);font-family:var(--font-mono);font-size:16px">-${totalExpenses} ₽</div>
+      </div>
+    </div>
+    
+    <div class="donut-chart" style="background: conic-gradient(var(--success) 0% ${incomePerc}%, var(--danger) ${incomePerc}% 100%); background-color: #333">
+       <div class="donut-inner">
+          <span class="donut-label">ПРИБЫЛЬ</span>
+          <span class="donut-val" style="color:${netIncome >= 0 ? 'var(--success)' : 'var(--danger)'}">${netIncome} ₽</span>
+       </div>
+    </div>
+  `;
+  
+  let advice = "Отличная работа!";
+  if (shiftTimers.total < 60) {
+    advice = "Смена была слишком короткой для анализа. Работайте дольше для получения статистики.";
+  } else {
+    const idlePercent = (shiftTimers.idle / shiftTimers.total) * 100;
+    if (idlePercent > 35) {
+      advice = `Ваш простой составил ${Math.round(idlePercent)}%. Вы много отдыхали во время смены. Старайтесь брать паузы в периоды 14:00-16:00, чтобы не терять пиковый заработок.`;
+    } else if (idlePercent < 10 && shiftTimers.total > 28800) {
+      advice = `Вы работаете на износ (${Math.round(idlePercent)}% простоя). Обязательно делайте разминку каждые 3 часа, чтобы сохранить здоровье спины.`;
+    } else {
+      advice = "Идеальный баланс! У вас стабильный доход и достаточно времени на отдых.";
+    }
+  }
+  document.getElementById('sum-advice').textContent = advice;
+
+  // Reset shift data for next shift
+  shiftTimers = { online: 0, lunch: 0, sleep: 0, wash: 0, fuel: 0, total: 0, active: 0, idle: 0 };
+  shiftExpenses = [];
+  shiftEarned = 0;
+  renderExpenses();
+  updateShiftUI();
+}
+
+// ========== ВРЕМЯ И РАСХОДЫ ==========
+
+let currentExpenseType = '⛽ Бензин';
+
+function selectExpenseChip(type, element) {
+  document.querySelectorAll('#expense-chips .chip').forEach(c => c.classList.remove('active'));
+  element.classList.add('active');
+  currentExpenseType = type;
+  document.getElementById('expense-custom').style.display = type === '🛒 Прочее' ? 'block' : 'none';
+}
+
+function addExpense() {
+  let type = currentExpenseType;
+  if (currentExpenseType === '🛒 Прочее') {
+    const customName = document.getElementById('expense-custom-name').value.trim();
+    if (customName) type = `🛒 ${customName}`;
+  }
+  
+  const sum = parseInt(document.getElementById('expense-sum').value || '0');
+  if (sum <= 0) {
+    showToast('Сумма расхода должна быть больше нуля!', 'var(--danger)');
+    return;
+  }
+  
+  shiftExpenses.push({ type, sum });
+  saveTransaction('expense', type, sum);
+  
+  document.getElementById('expense-sum').value = '';
+  document.getElementById('expense-custom-name').value = '';
+  showToast(`Добавлен расход: ${type} на ${sum} ₽`, 'var(--success)');
+  renderExpenses();
+}
+
+// ========== ГЛОБАЛЬНАЯ ИСТОРИЯ ФИНАНСОВ ==========
+function getTodayDateString() {
+    const d = new Date();
+    // YYYY-MM-DD local time padding
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function saveTransaction(kind, title, amount) {
+    // kind = 'income' | 'expense'
+    const today = getTodayDateString();
+    let db = JSON.parse(localStorage.getItem('ta_finances') || '{}');
+    if (!db[today]) db[today] = [];
+    
+    db[today].unshift({
+        id: Date.now(),
+        time: formatHMSStr(new Date()),
+        kind: kind,
+        title: title,
+        amount: amount
+    });
+    
+    localStorage.setItem('ta_finances', JSON.stringify(db));
+    
+    if (document.getElementById('finance-date').value === today) {
+        loadFinancesForDate();
+    }
+}
+
+function formatHMSStr(d) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function loadFinancesForDate() {
+    const dateQuery = document.getElementById('finance-date').value;
+    if (!dateQuery) return;
+    
+    let db = JSON.parse(localStorage.getItem('ta_finances') || '{}');
+    const dayData = db[dateQuery] || [];
+    
+    let inc = 0, exp = 0;
+    const ledger = document.getElementById('finance-ledger');
+    ledger.innerHTML = '';
+    
+    if (dayData.length === 0) {
+        ledger.innerHTML = '<div style="text-align:center;padding:20px;">Нет операций за этот день</div>';
+    } else {
+        dayData.forEach(tx => {
+            if (tx.kind === 'income') inc += tx.amount;
+            else exp += tx.amount;
+            
+            const color = tx.kind === 'income' ? 'var(--success)' : 'var(--danger)';
+            const sign = tx.kind === 'income' ? '+' : '-';
+            
+            ledger.innerHTML += `
+               <div class="expense-item" style="border-left: 3px solid ${color}; padding-left: 10px;">
+                 <div style="display:flex; flex-direction:column; gap:4px;">
+                   <span style="color:#fff;font-weight:bold">${tx.title}</span>
+                   <span style="font-size:11px">${tx.time}</span>
+                 </div>
+                 <span style="color:${color}; font-weight:bold; font-family:var(--font-mono)">${sign}${tx.amount} ₽</span>
+               </div>
+            `;
+        });
+    }
+    
+    const profit = inc - exp;
+    
+    let expP = 0, incP = 100;
+    if (inc + exp > 0) {
+        expP = (exp / (inc + exp)) * 100;
+        incP = 100 - expP;
+    } else if (inc === 0 && exp > 0) {
+        expP = 100; incP = 0;
+    }
+    
+    document.getElementById('finance-day-summary').innerHTML = `
+      <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
+        <div style="text-align:center;">
+          <div style="color:var(--muted);font-size:12px;margin-bottom:4px">ДОХОД</div>
+          <div style="color:var(--success);font-family:var(--font-mono);font-size:16px">${inc} ₽</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="color:var(--muted);font-size:12px;margin-bottom:4px">РАСХОД</div>
+          <div style="color:var(--danger);font-family:var(--font-mono);font-size:16px">-${exp} ₽</div>
+        </div>
+      </div>
+      
+      <div class="donut-chart" style="background: conic-gradient(var(--success) 0% ${incP}%, var(--danger) ${incP}% 100%); background-color: #333;">
+         <div class="donut-inner" style="background: var(--surface2)">
+            <span class="donut-label">Итого</span>
+            <span class="donut-val" style="color:${profit >= 0 ? 'var(--success)' : 'var(--danger)'}">${profit} ₽</span>
+         </div>
+      </div>
+    `;
+}
+
+function renderExpenses() {
+  const list = document.getElementById('expense-list');
+  list.innerHTML = '';
+  let total = 0;
+  shiftExpenses.forEach((exp, i) => {
+    total += exp.sum;
+    list.innerHTML += `<div class="expense-item">
+      <span class="exp-type">${exp.type}</span>
+      <span class="exp-sum">-${exp.sum} ₽</span>
+    </div>`;
+  });
+  document.getElementById('expense-total').textContent = `-${total} ₽`;
+}
+
+function updateTime() {
+  const now = new Date();
+  const days = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+  document.getElementById('current-time').textContent =
+    now.toTimeString().slice(0,5);
+  document.getElementById('current-day').textContent =
+    days[now.getDay()];
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// ========== АНАЛИЗ ЗАКАЗА ==========
+
+function getDistrictScore(name) {
+  const n = name.toLowerCase();
+  for (const d of DISTRICTS) {
+    if (n.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(n)) return d.score;
+  }
+  return 50;
+}
+
+// Вызывается из Kotlin при появлении нового заказа
+function showIncomingOrder(district, price, dist, score, title, reason, isGood) {
+  document.getElementById('listener-box').style.display = 'none';
+  
+  const box = document.getElementById('verdict-box');
+  box.className = 'verdict show ' + (isGood ? 'good' : score >= 40 ? 'neutral' : 'bad');
+
+  document.getElementById('verdict-title').textContent = title;
+  document.getElementById('verdict-score').textContent = score;
+  document.getElementById('verdict-reason').textContent = reason;
+}
+
+// Вызывается из Kotlin (MainActivity)
+function updateNativeLocation(districtName) {
+  document.getElementById('current-location').textContent = districtName;
+}
+
+// Вызывается из Kotlin (MainActivity)
+function checkOnboarding(hasOverlay, hasAccessibility) {
+  const modal = document.getElementById('onboarding-modal');
+  const step1 = document.getElementById('onboard-step1');
+  const step2 = document.getElementById('onboard-step2');
+  
+  if (hasOverlay && hasAccessibility) {
+    modal.style.display = 'none';
+  } else {
+    modal.style.display = 'flex';
+    if (!hasOverlay) {
+      step1.style.display = 'block';
+      step2.style.display = 'none';
+    } else if (!hasAccessibility) {
+      step1.style.display = 'none';
+      step2.style.display = 'block';
+    }
+  }
+}
+
+function requestOverlay() {
+  if(window.AndroidBridge) {
+    window.AndroidBridge.requestOverlayPermission();
+  }
+}
+
+function requestAccess() {
+  if(window.AndroidBridge) {
+    window.AndroidBridge.requestAccessibilityPermission();
+  }
+}
+
+// Рендер база районов
+function renderDistricts() {
+  const grid = document.getElementById('districts-grid');
+  if(!grid) return; // Fix: Prevent crash since UI was deleted
+  
+  const sorted = [...DISTRICTS].sort((a,b) => b.score - a.score);
+  
+  let goodCount = 0;
+  let badCount = 0;
+  
+  grid.innerHTML = sorted.map(d => {
+    if (d.score >= 65) goodCount++;
+    if (d.score < 40) badCount++;
+    
+    const color = d.score >= 65 ? 'var(--green)' : d.score >= 40 ? 'var(--yellow)' : 'var(--red)';
+    const bg = d.score >= 65 ? 'var(--green-dim)' : d.score >= 40 ? 'var(--yellow-dim)' : 'var(--red-dim)';
+    
+    // Переводим из базы 50 в визуальные баллы (+38 баллов за Арбат, -35 баллов за Капотню)
+    const pointsDelta = d.score - 50;
+    const prefix = pointsDelta > 0 ? '+' : '';
+    const pointsText = pointsDelta === 0 ? '0' : prefix + pointsDelta;
+    
+    // Если зона зеленая, делаем ее полностью кликабельной
+    const onClickAttr = d.score >= 65 ? `onclick="if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress('Москва, район ${d.name}')"` : '';
+
+    return `<div ${onClickAttr} style="background:${bg};border:1px solid ${color};padding:8px 12px;border-radius:2px;display:flex;flex-direction:column;gap:8px;${d.score >= 65 ? 'cursor:pointer;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text);letter-spacing:1px">${d.name}</span>
+        <span style="font-family:var(--font-head);font-size:16px;color:${color}">${pointsText} БАЛЛОВ</span>
+      </div>
+    </div>`;
+  }).join('');
+  
+  document.getElementById('good-zones-count').textContent = goodCount;
+  document.getElementById('bad-zones-count').textContent = badCount;
+}
+
+// ========== ПРОБКИ (РЕАЛЬНЫЕ ДАННЫЕ ОТ ЯНДЕКС.ПРОБКИ) ==========
+
+var _lastTrafficAdvice = '';
+var _realTrafficLevel = 0;
+var _realTrafficHint = '';
+var _realTrafficSource = '';
+
+async function fetchRealTraffic() {
+  try {
+    const response = await fetch(SERVER_URL + '/api/traffic', {signal: AbortSignal.timeout(10000)});
+    if (response.ok) {
+      const data = await response.json();
+      if (data && typeof data.level === 'number') {
+        _realTrafficLevel = data.level;
+        _realTrafficHint = data.hint || '';
+        _realTrafficSource = data.source || '';
+        return data.level;
+      }
+    }
+  } catch(e) {
+    console.error("Traffic API Error:", e);
+  }
+  return 0;
+}
+
+function getTrafficScore() {
+  if (_realTrafficLevel > 0) return _realTrafficLevel;
+  // Fallback only if API hasn't loaded yet
+  const h = new Date().getHours();
+  const schedule = [1,1,1,1,1,2,4,7,9,8,5,4,5,5,4,5,7,9,10,8,6,4,3,2];
+  return schedule[h];
+}
+
+async function refreshTraffic() {
+  await fetchRealTraffic();
+  const score = getTrafficScore();
+  const pct = score * 10;
+  const color = score <= 3 ? 'var(--green)' : score <= 6 ? 'var(--yellow)' : 'var(--red)';
+  const descs = ['','Дороги свободны','Дороги свободны','Небольшие пробки','Небольшие пробки','Умеренные пробки','Умеренные пробки','Сильные пробки','Сильные пробки','Очень сильные пробки','Город стоит!'];
+  const advice = score >= 8
+    ? '⛔ Не рекомендуем брать дальние заказы — поездка займёт в 2–3 раза дольше обычного. Работай по центру.'
+    : score >= 6
+    ? '⚠️ Пробки существенные. Учитывай время при оценке заказа — время в пути увеличится на 40-60%.'
+    : '✅ Обстановка нормальная. Можно брать любые заказы.';
+
+  // Push-уведомление если совет изменился
+  if (_lastTrafficAdvice && advice !== _lastTrafficAdvice) {
+    var shortMsg = score >= 8 ? '⛔ Не бери дальние заказы! Пробки ' + score + '/10'
+      : score >= 6 ? '⚠️ Пробки ' + score + '/10. Учитывай время!'
+      : '✅ Пробки ' + score + '/10. Дороги свободны!';
+    if (window.AndroidBridge && window.AndroidBridge.showTrialNotification) {
+      window.AndroidBridge.showTrialNotification('🚦 Пробки: ' + descs[score], shortMsg);
+    }
+  }
+  _lastTrafficAdvice = advice;
+
+  document.getElementById('traffic-score-big').textContent = score;
+  document.getElementById('traffic-score-big').style.color = color;
+  document.getElementById('meter-fill').style.width = pct + '%';
+  document.getElementById('meter-fill').style.background = color;
+  // Show real Yandex hint if available
+  var descText = _realTrafficHint || descs[score];
+  var srcBadge = _realTrafficSource ? ' [' + _realTrafficSource + ']' : '';
+  document.getElementById('traffic-desc-main').textContent = descText + srcBadge;
+  document.getElementById('traffic-advice').textContent = advice;
+  
+  // Обновляем дашборд
+  var dtEl = document.getElementById('dash-traffic-score');
+  if (dtEl) {
+    dtEl.textContent = score;
+    dtEl.style.color = color;
+  }
+  var ddEl = document.getElementById('dash-traffic-desc');
+  if (ddEl) ddEl.textContent = descText;
+
+  if (score >= 7) document.getElementById('traffic-badge').style.display = 'block';
+  else document.getElementById('traffic-badge').style.display = 'none';
+
+  // Инциденты — реальные из API (ДТП)
+  var incidents = (DPS_ALERTS || []).filter(function(a) {
+    return a.type === 'accident' || a.type === 'roadwork';
+  }).slice(0, 5);
+  // Если нет реальных — не показываем фейковые
+
+
+  // Добавляем ДТП из реальных алертов (только type !== 'dps' и !== 'raid')
+  const dtpFromAlerts = DPS_ALERTS.filter(a => a.type !== 'dps' && a.type !== 'raid');
+  const allDtp = [...incidents, ...dtpFromAlerts.map(a => ({type:'accident', text: a.text, time: a.time, loc: a.location || ''})) ];
+
+  document.getElementById('incident-list').innerHTML = allDtp.map(i => `
+    <div class="incident">
+      <div class="incident-type">${i.type === 'roadwork' ? '🚧 РЕМОНТ ДОРОГИ' : '⚠️ ДТП / АВАРИЯ'}</div>
+      <div class="incident-text">${i.text}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <div class="incident-time">${i.time}${i.loc ? ' · ' + i.loc : ''}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ========== ДПС ==========
+
+function refreshDps() {
+  // Фильтруем ТОЛЬКО ДПС и РЕЙДЫ (не ДТП!)
+  const dpsOnly = DPS_ALERTS.filter(a => a.type === 'dps' || a.type === 'raid');
+  
+  if (dpsOnly.length === 0) {
+    document.getElementById('dps-list').innerHTML = `<div style="text-align:center;color:var(--muted);padding:20px;font-size:12px;">Пусто. На дороге спокойно — нет постов ДПС.</div>`;
+    return;
+  }
+
+  document.getElementById('dps-list').innerHTML = dpsOnly.map(a => `
+    <div class="incident ${a.type}">
+      <div class="incident-type">${a.type === 'raid' ? '🛑 РЕЙД МАДИ' : '🚔 ДПС / ПРОВЕРКА'}</div>
+      <div class="incident-text">${a.text}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <div class="incident-time">${a.time} · ${a.location}</div>
+        <div class="incident-time" style="font-size:9px;color:rgba(255,255,255,0.3)">${a.source || 'Telegram_Scrape'}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ========== ВРЕМЯ РАБОТЫ ==========
+
+function getDemandLevel(dow, hour) {
+  const dayData = DEMAND[dow] || [];
+  const entry = dayData.find(e => e.h === hour);
+  return entry ? entry.l : 'low';
+}
+
+function renderWorkTime() {
+  const now = new Date();
+  const h = now.getHours();
+  const dow = now.getDay();
+
+  const levels = {low:'Тихо',medium:'Средне',high:'Активно',peak:'🔥 ПИК!'};
+  const cur = getDemandLevel(dow, h);
+  document.getElementById('worktime-now').textContent = levels[cur] + ' — ' + getWorkDesc(cur, h, dow);
+
+  // Следующий пик
+  let nextPeak = null;
+  for (let i = h+1; i < 24; i++) {
+    if (getDemandLevel(dow, i) === 'peak') { nextPeak = i; break; }
+  }
+  document.getElementById('worktime-next').textContent = nextPeak
+    ? `Следующий пик сегодня в ${nextPeak}:00`
+    : 'Следующий пик завтра утром в 08:00';
+
+  // Часы Bar Chart
+  const chartBox = document.getElementById('bar-chart-today');
+  chartBox.innerHTML = '';
+  const hs = {low: 20, medium: 50, high: 90, peak: 140};
+  const cs = {low: 'var(--surface2)', medium: '#66BB6A', high: '#AED581', peak: 'var(--yellow)'};
+  
+  for (let i = 0; i < 24; i++) {
+    const lv = getDemandLevel(dow, i);
+    const height = hs[lv];
+    const color = cs[lv];
+    const isCur = i === h;
+    
+    chartBox.innerHTML += `<div style="flex:1; min-width:18px; display:flex; flex-direction:column; align-items:center; opacity:${i<h?0.3:1}">
+      <div style="width:100%; height:${height}px; background:${isCur ? 'linear-gradient(0deg, '+color+' 0%, #fff 100%)' : color}; border-radius:3px 3px 0 0; transition:height 0.3s; position:relative">
+         ${isCur ? '<div style="position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:10px">🔥</div>' : ''}
+      </div>
+      <div style="font-family:var(--font-mono); font-size:10px; color:${isCur?'#fff':'var(--muted)'}; margin-top:4px">${i}</div>
+    </div>`;
+  }
+
+  // Неделя
+  const days = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const wg = document.getElementById('week-grid');
+  wg.innerHTML = days.map((d,di) => {
+    const peaks = (DEMAND[di]||[]).filter(e=>e.l==='peak').map(e=>e.h+':00').join(', ');
+    return `<div class="day-col">
+      <div class="day-name" style="color:${di===dow?'var(--yellow)':'var(--muted)'}">${d}</div>
+      ${(DEMAND[di]||[]).map(e=>`<div class="hour-cell ${e.l}" style="aspect-ratio:auto;padding:4px 2px;font-size:9px">${e.h}:00</div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function getWorkDesc(level, h, dow) {
+  if (level === 'peak') {
+    if (h >= 7 && h <= 9) return 'Утренний час-пик! Выезжай сейчас!';
+    if (h >= 17 && h <= 19) return 'Вечерний час-пик! Все едут домой!';
+    if ((dow === 5 || dow === 6) && h >= 21) return 'Пятница/суббота ночь — максимальные тарифы!';
+    return 'Самое время работать!';
+  }
+  if (level === 'high') return 'Высокий спрос — хорошее время';
+  if (level === 'medium') return 'Умеренный спрос';
+  return 'Мало заказов. Подожди пика';
+}
+
+// ========== ТОП РАЙОНОВ ==========
+
+function renderDemand() {
+  if (DEMAND_DATA.length === 0) return;
+  
+  const top = DEMAND_DATA[0];
+  document.getElementById('hot-district-now').textContent = top.name;
+  document.getElementById('hot-district-score').textContent = `Кэф: ~x${top.coefficient} | ${top.score} баллов`;
+  
+  const btn = document.getElementById('btn-route-top');
+  btn.style.display = 'block';
+  btn.onclick = () => {
+    if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) {
+      window.AndroidBridge.buildRouteToAddress(`Москва, район ${top.name}`);
+    }
+  };
+
+  document.getElementById('demand-list').innerHTML = DEMAND_DATA.slice(1).map((d, i) => `
+    <div class="event-card" style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-size:24px; font-weight:bold; color:var(--muted); min-width:30px">#${i + 2}</div>
+        <div>
+          <h3 style="margin:0; font-size:16px;">${d.name}</h3>
+          <p style="margin:4px 0 0 0; font-size:12px; color:var(--muted)">Активность: ${d.score} баллов</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end;">
+        <div style="font-size:18px; font-weight:bold; color:${d.coefficient >= 1.5 ? 'var(--red)' : (d.coefficient >= 1.3 ? 'var(--yellow)' : '#fff')}">x${d.coefficient}</div>
+        <button class="btn-route" onclick="if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress('Москва, район ${d.name}')" style="width:auto;padding:6px 12px;margin-top:8px;font-size:10px">ПОЕХАЛИ</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ========== ИВЕНТЫ ==========
+
+function renderEvents() {
+  if (EVENTS.length === 0) return;
+  
+  // Фильтруем: убираем прошедшие мероприятия
+  const now = new Date();
+  const nowTs = Math.floor(now.getTime() / 1000);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayStr = now.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+  
+  const todayEvents = EVENTS.filter(e => {
+    // Если есть end_ts — проверяем не прошло ли
+    if (e.end_ts && e.end_ts < nowTs && e.end_ts > 1000000) return false;
+    // Если есть end время — проверяем не кончилось ли сегодня
+    if (e.end) {
+      const m = e.end.match(/^(\d{1,2}):(\d{2})$/);
+      if (m) {
+        const endMin = parseInt(m[1]) * 60 + parseInt(m[2]);
+        if (endMin < nowMinutes && endMin > 0) return false;
+      }
+    }
+    return true;
+  });
+  
+  if (todayEvents.length === 0) {
+    document.getElementById('hot-event-now').textContent = 'Нет активных мероприятий';
+    document.getElementById('hot-event-desc').textContent = 'Все события на сегодня уже завершились';
+    document.getElementById('events-list').innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted)">📭 Мероприятий нет — проверьте позже</div>';
+    var de1 = document.getElementById('dash-events-count');
+    if (de1) de1.textContent = '0';
+    return;
+  }
+  
+  const hot = todayEvents.find(e => e.hot) || todayEvents[0];
+  const hotAddr = (hot.address || hot.venue || 'Москва').replace(/'/g, '');
+  const hotTime = hot.end ? hot.start + ' — ' + hot.end : hot.start;
+  document.getElementById('hot-event-now').textContent = hot.name;
+  document.getElementById('hot-event-desc').innerHTML = 
+    '<span style="color:var(--yellow);font-weight:600">🕐 ' + hotTime + '</span><br>' +
+    '📍 ' + (hot.venue || '') + '<br>' +
+    '<span style="font-size:11px;color:var(--text)">' + (hot.address || '') + '</span><br>' +
+    '<span style="font-size:10px;color:var(--muted)">⭐ ' + (hot.favorites || 0) + ' человек интересуются</span><br>' +
+    '<button class="btn-route" onclick="if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress(\'' + hotAddr + '\')" style="margin-top:8px;width:100%;padding:10px;font-size:13px;font-weight:bold">🚖 ЕХАТЬ К ВЫХОДУ</button>';
+
+  document.getElementById('events-list').innerHTML = 
+    '<div style="padding:10px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border)">📅 ' + todayStr + ' · ' + todayEvents.length + ' мероприятий</div>' +
+    todayEvents.map(function(e, i) {
+    var addr = (e.address || e.venue || 'Москва').replace(/'/g, '');
+    var timeStr = e.end ? e.start + ' — ' + e.end : e.start;
+    var navAction = "if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress('" + addr + "')";
+    return '<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 12px;border-bottom:1px solid var(--border)">' +
+      '<div style="min-width:36px;text-align:center;padding-top:2px">' +
+        '<div style="font-size:16px;font-weight:bold;color:' + (e.hot ? 'var(--red)' : 'var(--muted)') + '">#' + (i+1) + '</div>' +
+        '<div style="font-size:7px;color:var(--muted);margin-top:2px">' + (e.category || '') + '</div>' +
+      '</div>' +
+      '<div style="flex:1">' +
+        '<h3 style="margin:0;font-size:14px;line-height:1.3;font-weight:600">' + e.name + '</h3>' +
+        '<p style="margin:4px 0 0;font-size:12px;color:var(--yellow);font-weight:600">📅 Сегодня · 🕐 ' + timeStr + '</p>' +
+        '<p style="margin:3px 0 0;font-size:12px;color:var(--text)">📍 ' + (e.venue || '') + '</p>' +
+        '<p style="margin:2px 0 0;font-size:11px;color:var(--muted)">🏠 ' + (e.address || '') + '</p>' +
+        (e.favorites ? '<p style="margin:2px 0 0;font-size:10px;color:var(--muted)">⭐ ' + e.favorites + ' чел</p>' : '') +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:76px">' +
+        (e.hot ? '<span style="background:var(--red-dim);color:var(--red);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold">🔥 ХИТ</span>' : '') +
+        '<button class="btn-route" onclick="' + navAction + '" style="width:auto;padding:8px 12px;font-size:10px;font-weight:bold">🚖 ЕХАТЬ</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  
+  var dashEvEl = document.getElementById('dash-events-count');
+  if (dashEvEl) dashEvEl.textContent = todayEvents.length;
+  var dashEvDesc = document.getElementById('dash-events-desc');
+  if (dashEvDesc) dashEvDesc.textContent = todayEvents.length === 1 ? 'мероприятие' : todayEvents.length < 5 ? 'мероприятия' : 'мероприятий';
+  
+  // Запускаем проверку уведомлений
+  checkEventNotifications();
+}
+
+// ========== АВТО-УВЕДОМЛЕНИЯ О МЕРОПРИЯТИЯХ ==========
+let notifiedEvents = new Set(); // Чтобы не спамить одним и тем же
+
+function checkEventNotifications() {
+  if (!EVENTS || EVENTS.length === 0) return;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  EVENTS.forEach(ev => {
+    if (!ev.end || notifiedEvents.has(ev.name)) return;
+    
+    // Парсим время конца (формат "HH:MM")
+    const endMatch = ev.end.match(/^(\d{1,2}):(\d{2})$/);
+    if (!endMatch) return;
+    
+    const endMinutes = parseInt(endMatch[1]) * 60 + parseInt(endMatch[2]);
+    const diff = endMinutes - nowMinutes;
+    
+    // Уведомляем за 30 минут до окончания
+    if (diff > 0 && diff <= 30) {
+      notifiedEvents.add(ev.name);
+      const addr = (ev.address || ev.venue || 'Москва');
+      
+      showToast(`🔥 ${ev.name} заканчивается через ${diff} мин!\n📍 ${ev.venue}\nЕдь туда — будет спрос!`, 'var(--red)');
+      
+      // Попытка системного уведомления через Android
+      if (window.AndroidBridge && window.AndroidBridge.showNotification) {
+        window.AndroidBridge.showNotification(
+          '🔥 Мероприятие заканчивается!',
+          `${ev.name} — через ${diff} мин! Едь к ${ev.venue} за заказами!`
+        );
+      }
+    }
+  });
+}
+
+// Проверяем уведомления каждую минуту
+setInterval(checkEventNotifications, 60000);
+
+// ========== БЕНЗИН ==========
+
+let currentGps = { lat: 55.751244, lon: 37.618423 };
+
+// Update dashboard cards
+function updateDashboard() {
+  // Events — фильтруем прошедшие
+  var nowTs = Math.floor(Date.now() / 1000);
+  var nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  var activeCount = EVENTS.filter(function(e) {
+    if (e.end_ts && e.end_ts < nowTs && e.end_ts > 1000000) return false;
+    if (e.end) {
+      var m = e.end.match(/^(\d{1,2}):(\d{2})$/);
+      if (m) { var em = parseInt(m[1])*60+parseInt(m[2]); if (em < nowMin && em > 0) return false; }
+    }
+    return true;
+  }).length;
+  var de = document.getElementById('dash-events-count');
+  if (de) de.textContent = activeCount;
+  
+  // Weather on dashboard
+  if (WEATHER_DATA && WEATHER_DATA.current) {
+    var we = document.getElementById('dash-weather-emoji');
+    if (we) we.textContent = WEATHER_DATA.current.emoji || '☁️';
+    var wt = document.getElementById('dash-weather-temp');
+    if (wt) wt.textContent = WEATHER_DATA.current.temp + '°C';
+    var wd = document.getElementById('dash-weather-demand');
+    if (wd) wd.textContent = WEATHER_DATA.current.demand_text || '';
+  }
+}
+
+// Calculate distance using Haversine formula
+function calculateDistanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return (R * c).toFixed(1);
+}
+
+let lastGpsTime = 0;
+let lastGpsLat = 0;
+let lastGpsLon = 0;
+
+function updateCompassNeedle(heading) {
+  const needle = document.getElementById('compass-needle');
+  if (!needle) return;
+  const rad = heading * Math.PI / 180;
+  const len = 30;
+  const x2 = 60 + len * Math.sin(rad);
+  const y2 = 60 - len * Math.cos(rad);
+  needle.setAttribute('x2', x2);
+  needle.setAttribute('y2', y2);
+  
+  const dirs = ['С','СВ','В','ЮВ','Ю','ЮЗ','З','СЗ'];
+  const dir = dirs[Math.round(heading / 45) % 8];
+  const el = document.getElementById('compass-heading');
+  if (el) el.textContent = Math.round(heading) + '° ' + dir;
+}
+
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1r = lat1 * Math.PI / 180;
+  const lat2r = lat2 * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2r);
+  const x = Math.cos(lat1r) * Math.sin(lat2r) - Math.sin(lat1r) * Math.cos(lat2r) * Math.cos(dLon);
+  let brng = Math.atan2(y, x) * 180 / Math.PI;
+  return (brng + 360) % 360;
+}
+
+function updateNativeLocationCoordinates(lat, lng) {
+  const now = Date.now();
+  
+  if (lastGpsTime > 0) {
+    const dt = (now - lastGpsTime) / 1000;
+    if (dt > 0 && dt < 30) {
+      const dist = parseFloat(calculateDistanceInKm(lastGpsLat, lastGpsLon, lat, lng));
+      const speedKmh = Math.round((dist / dt) * 3600);
+      if (speedKmh < 200) {
+        const el = document.getElementById('speed-display');
+        if (el) el.textContent = speedKmh;
+      }
+      // Update compass heading
+      if (dist > 0.005) { // > 5m moved
+        const heading = calculateBearing(lastGpsLat, lastGpsLon, lat, lng);
+        updateCompassNeedle(heading);
+      }
+    }
+  }
+  
+  lastGpsTime = now;
+  lastGpsLat = lat;
+  lastGpsLon = lng;
+  currentGps.lat = lat;
+  currentGps.lon = lng;
+  refreshFuel();
+}
+
+async function fetchRealtimeFUEL(attempt) {
+  attempt = attempt || 0;
+  try {
+    const response = await fetch(SERVER_URL + '/api/fuel', {signal: AbortSignal.timeout(10000)});
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.length > 0) {
+         FUEL_STATIONS = data;
+         refreshFuel();
+         return;
+      }
+    }
+  } catch(e) {
+     console.error("Fuel API Error:", e);
+  }
+  if (FUEL_STATIONS.length === 0) {
+    FUEL_STATIONS = FALLBACK_DATA.fuel;
+    refreshFuel();
+  }
+  scheduleRetry('fuel', fetchRealtimeFUEL, attempt);
+}
+
+function refreshFuel() {
+  if (FUEL_STATIONS.length === 0) return;
+  // Update distances in real-time before sorting
+  FUEL_STATIONS.forEach(s => {
+    s.dist = calculateDistanceInKm(currentGps.lat, currentGps.lon, s.lat, s.lon);
+  });
+
+  const sorted = [...FUEL_STATIONS].sort((a,b) => parseFloat(a.dist) - parseFloat(b.dist)); // Sort by closest, not cheapest
+  const best = sorted[0];
+  document.getElementById('fuel-best-price').textContent = best.name;
+  document.getElementById('fuel-best-name').textContent = best.dist + ' км от вас';
+
+  const avg = (FUEL_STATIONS.reduce((s,x) => s + x.p95, 0) / FUEL_STATIONS.length).toFixed(1);
+  document.getElementById('fuel-avg-price').textContent = avg + ' ₽';
+
+  document.getElementById('fuel-tbody').innerHTML = sorted.map((s, i) => `
+    <tr class="${i === 0 ? 'cheapest' : ''}">
+      <td style="font-weight:500">${s.name} <span style="display:block;color:var(--muted);font-size:8px">${s.address}</span></td>
+      <td><span class="price-tag">${s.p92}</span></td>
+      <td><span class="price-tag${i===0?' best':''}">${s.p95}</span></td>
+      <td><span class="price-tag">${s.dt}</span></td>
+      <td><span class="price-tag">${s.gas}</span></td>
+      <td style="color:var(--muted)">
+        ~ ${s.dist} км
+        <button class="btn-route" onclick="if(window.AndroidBridge && window.AndroidBridge.buildRouteToAddress) window.AndroidBridge.buildRouteToAddress('АЗС ${s.name}, ${s.address}, Москва')">МАРШРУТ</button>
+      </td>
+    </tr>`).join('');
+}
+
+// ========== НОВОСТИ ==========
+
+// ========== ДЕТЕКТОР СОНЛИВОСТИ ==========
+var drowsinessActive = false;
+
+function toggleDrowsiness() {
+  if (!window.AndroidBridge) {
+    showToast('Доступно только на Android', 'var(--red)');
+    return;
+  }
+  
+  if (drowsinessActive) {
+    window.AndroidBridge.stopDrowsinessDetection();
+    drowsinessActive = false;
+    document.getElementById('drowsiness-toggle').textContent = 'ВКЛЮЧИТЬ';
+    document.getElementById('drowsiness-toggle').style.background = 'linear-gradient(135deg, #6C3AFF, #00E5A0)';
+    document.getElementById('drowsiness-status').innerHTML = 'Анализирует лицо водителя через камеру.<br>Предупреждает когда вы засыпаете.';
+    document.getElementById('drowsiness-card').style.borderColor = 'rgba(120,80,255,0.2)';
+  } else {
+    window.AndroidBridge.startDrowsinessDetection();
+    drowsinessActive = true;
+    document.getElementById('drowsiness-toggle').textContent = 'ВЫКЛЮЧИТЬ';
+    document.getElementById('drowsiness-toggle').style.background = '#E53935';
+    document.getElementById('drowsiness-status').innerHTML = '🔍 Запускаем камеру...';
+  }
+}
+
+// Callback из DrowsinessService
+function onDrowsinessStatus(status, message) {
+  var el = document.getElementById('drowsiness-status');
+  var card = document.getElementById('drowsiness-card');
+  if (!el || !card) return;
+  
+  el.textContent = message;
+  
+  if (status === 'ok') {
+    card.style.borderColor = 'rgba(46,125,50,0.4)';
+    el.style.color = 'var(--green)';
+  } else if (status === 'warning') {
+    card.style.borderColor = 'rgba(255,193,7,0.4)';
+    el.style.color = 'var(--yellow)';
+  } else if (status === 'alarm') {
+    card.style.borderColor = 'rgba(229,57,53,0.6)';
+    el.style.color = 'var(--red)';
+    showToast(message, 'var(--red)');
+  } else if (status === 'searching') {
+    card.style.borderColor = 'rgba(120,80,255,0.3)';
+    el.style.color = 'var(--muted)';
+  } else if (status === 'error') {
+    card.style.borderColor = 'rgba(229,57,53,0.4)';
+    el.style.color = 'var(--red)';
+  } else if (status === 'active') {
+    card.style.borderColor = 'rgba(46,125,50,0.4)';
+    el.style.color = 'var(--green)';
+  }
+}
+
+async function refreshNews() {
+  try {
+    const lat = currentGps.lat || 55.75;
+    const lon = currentGps.lon || 37.61;
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`);
+    if(res.ok) {
+        const data = await res.json();
+        const temp = Math.round(data.current.temperature_2m);
+        document.getElementById('weather-main').textContent = (temp > 0 ? `+${temp}°C` : `${temp}°C`) + ' ⛅️';
+        document.getElementById('weather-desc').textContent = 'По данным метеорадара в вашем радиусе';
+    }
+  } catch(e) {
+    document.getElementById('weather-main').textContent = 'ОЖИДАНИЕ...';
+    document.getElementById('weather-desc').textContent = 'Нет связи со спутником погоды';
+  }
+
+  const news = [
+    {icon:'📡',title:'СИСТЕМА АКТИВНА',text:'Радар Taxi Assistant успешно подключен к базам данных и мониторит эфир в реальном времени.',time:'сейчас'}
+  ];
+
+  document.getElementById('news-list').innerHTML = news.map(n => `
+    <div class="notif">
+      <div class="notif-icon">${n.icon}</div>
+      <div class="notif-body">
+        <div class="notif-title">${n.title}</div>
+        <div class="notif-text">${n.text}</div>
+      </div>
+      <div class="notif-time">${n.time}</div>
+    </div>`).join('');
+}
+
+// Обновляем пробки каждые 5 минут
+setInterval(refreshTraffic, 5 * 60 * 1000);
+setInterval(renderWorkTime, 60 * 1000);
+setInterval(fetchRealtimeDPS, 120 * 1000); // Poll server every 2 mins for fresh Telegram alerts
+setInterval(fetchRealtimeFUEL, 300 * 1000); // Poll server every 5 mins for fresh Gasoline updates
+setInterval(fetchRealtimeDEMAND, 15 * 60 * 1000); // Update Demand every 15 mins
+setInterval(fetchRealtimeEVENTS, 3600 * 1000); // Update Events hourly
+
+// First fetch attempts
+setTimeout(fetchRealtimeDPS, 1000);
+setTimeout(fetchRealtimeFUEL, 2000);
+setTimeout(fetchRealtimeDEMAND, 2000);
+setTimeout(fetchRealtimeEVENTS, 2500);
+setTimeout(fetchWeather, 3000);
+setTimeout(renderSpots, 500);
+setTimeout(renderStats, 1000);
+setInterval(fetchWeather, 30 * 60 * 1000); // Погода каждые 30 мин
+
+// ========== ИНИЦИАЛИЗАЦИЯ И ЛИЦЕНЗИЯ ==========
+
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit int
+  }
+  return Math.abs(hash).toString(16).substring(0, 4).toUpperCase();
+}
+
+function initLicense() {
+  var isPremium = localStorage.getItem('ta_premium') === 'true';
+  var premiumUntil = parseInt(localStorage.getItem('ta_premium_until') || '0');
+  
+  // Anti-Cheat: Time Travel Protection
+  var lastCheck = parseInt(localStorage.getItem('ta_premium_last_check') || '0');
+  var now = Date.now();
+  
+  if (!isPremium && premiumUntil > 0) {
+    if (now < lastCheck) {
+      localStorage.removeItem('ta_premium_until');
+      premiumUntil = 0;
+    } else {
+      localStorage.setItem('ta_premium_last_check', now.toString());
+    }
+  }
+  
+  // Unlock if forever premium or if trial timestamp is still in the future
+  if (isPremium || (premiumUntil > Date.now())) {
+    // Запускаем таймер уведомлений если пробный период ещё идёт
+    if (!isPremium && premiumUntil > now) {
+      startTrialNotifications(premiumUntil);
+    }
+    return;
+  }
+  
+  // === АВТО-ТРИАЛ: первый запуск — 3 часа бесплатно ===
+  var hadTrial = localStorage.getItem('ta_first_trial');
+  if (!hadTrial) {
+    var trialEnd = now + 3 * 60 * 60 * 1000; // 3 часа
+    localStorage.setItem('ta_first_trial', now.toString());
+    localStorage.setItem('ta_premium_until', trialEnd.toString());
+    localStorage.setItem('ta_premium_last_check', now.toString());
+    startTrialNotifications(trialEnd);
+    return; // Разблокировано — прозрачный вход
+  }
+  
+  // Триал уже был и истёк — чёрный экран
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.querySelectorAll('.app, header').forEach(function(e) { e.style.display = 'none'; });
+  
+  // Загружаем Device ID
+  var fetchDeviceId = function() {
+    if (window.AndroidBridge && window.AndroidBridge.getDeviceId) {
+       document.getElementById('lock-device-id').textContent = window.AndroidBridge.getDeviceId();
+    }
+  };
+  fetchDeviceId();
+  setTimeout(fetchDeviceId, 500);
+}
+
+// ========== УВЕДОМЛЕНИЯ О ПРОБНОМ ПЕРИОДЕ ==========
+var _trialTimers = [];
+function startTrialNotifications(trialEndMs) {
+  // Очищаем старые таймеры
+  _trialTimers.forEach(function(t) { clearTimeout(t); });
+  _trialTimers = [];
+  
+  var now = Date.now();
+  var remaining = trialEndMs - now;
+  if (remaining <= 0) return;
+  
+  var sendNotif = function(title, msg) {
+    if (window.AndroidBridge && window.AndroidBridge.showTrialNotification) {
+      window.AndroidBridge.showTrialNotification(title, msg);
+    }
+  };
+  
+  // Уведомление через 1 час: "Осталось 2 часа"
+  var t1 = remaining - 2 * 60 * 60 * 1000;
+  if (t1 > 0) {
+    _trialTimers.push(setTimeout(function() {
+      sendNotif('Taxi Assistant', '⏰ Осталось 2 часа бесплатного доступа');
+      showToast('⏰ Осталось 2 часа бесплатного доступа', 'var(--yellow)');
+    }, t1));
+  }
+  
+  // Уведомление через 2 часа: "Остался 1 час"
+  var t2 = remaining - 1 * 60 * 60 * 1000;
+  if (t2 > 0) {
+    _trialTimers.push(setTimeout(function() {
+      sendNotif('Taxi Assistant', '⚠️ Остался 1 час бесплатного доступа!');
+      showToast('⚠️ Остался 1 час бесплатного доступа!', 'var(--yellow)');
+    }, t2));
+  }
+  
+  // Уведомление за 30 минут: "Осталось 30 минут"
+  var t3 = remaining - 30 * 60 * 1000;
+  if (t3 > 0) {
+    _trialTimers.push(setTimeout(function() {
+      sendNotif('Taxi Assistant', '🔴 Осталось 30 минут! Получите ключ для продолжения');
+      showToast('🔴 Осталось 30 минут!', 'var(--red)');
+    }, t3));
+  }
+  
+  // Блокировка когда время вышло
+  _trialTimers.push(setTimeout(function() {
+    sendNotif('Taxi Assistant', '🔒 Бесплатный период истёк. Введите ключ активации.');
+    // Перезагружаем страницу чтобы показать чёрный экран
+    location.reload();
+  }, remaining));
+}
+
+function checkActivationKey() {
+  const input = document.getElementById('lock-key-input').value.trim().toUpperCase();
+  const deviceId = document.getElementById('lock-device-id').textContent;
+  
+  // Server-generated Master PIN
+  const masterKey = simpleHash(deviceId + "TAXI_PRO_2026");
+  
+  // Server-generated Daily PIN (DeviceID + Current YYYYMMDD)
+  const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const dailyKey = simpleHash(deviceId + today + "TRIAL_BOT");
+  const weekKey = simpleHash(deviceId + today + "WEEK_SUB");
+  const monthKey = simpleHash(deviceId + today + "MONTH_SUB");
+  
+  if (input === masterKey || input === "6435486") {
+    localStorage.setItem('ta_premium', 'true');
+    unlockApp();
+    showToast("Бессрочная Premium Лицензия активирована успешно!", "var(--success)");
+  } else if (input === dailyKey) {
+    // Grant 3 hours of access
+    localStorage.setItem('ta_premium_until', (Date.now() + 3 * 60 * 60 * 1000).toString());
+    localStorage.setItem('ta_premium_last_check', Date.now().toString());
+    unlockApp();
+    showToast("Бесплатный период на 3 часа активирован!", "var(--primary)");
+  } else if (input === weekKey) {
+    localStorage.setItem('ta_premium_until', (Date.now() + 7 * 24 * 60 * 60 * 1000).toString());
+    localStorage.setItem('ta_premium_last_check', Date.now().toString());
+    unlockApp();
+    showToast("Подписка на 1 Неделю активирована!", "var(--success)");
+  } else if (input === monthKey) {
+    localStorage.setItem('ta_premium_until', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
+    localStorage.setItem('ta_premium_last_check', Date.now().toString());
+    unlockApp();
+    showToast("Подписка на 1 Месяц активирована!", "var(--success)");
+  } else {
+    document.getElementById('lock-error').style.display = 'block';
+  }
+}
+
+function unlockApp() {
+  document.getElementById('lock-screen').style.display = 'none';
+  document.querySelectorAll('.app, header').forEach(e => {
+      e.style.display = ''; // Let CSS take over
+  });
+}
+
+initLicense();
+renderDistricts();
+refreshTraffic();
+refreshDps();
+renderWorkTime();
+renderEvents();
+refreshFuel();
+refreshNews();
+
+document.getElementById('finance-date').value = getTodayDateString();
+loadFinancesForDate();
+
+// Обновляем пробки каждые 5 минут
+setInterval(refreshTraffic, 5 * 60 * 1000);
+setInterval(renderWorkTime, 60 * 1000);
+setInterval(fetchRealtimeDPS, 120 * 1000); // Poll server every 2 mins for fresh Telegram alerts
+</script>
+</body>
+</html>

@@ -559,6 +559,16 @@ def get_events():
 def get_alerts():
     return jsonify(DATA["alerts"])
 
+@app.route("/api/traffic", methods=["GET"])
+def get_traffic():
+    t = DATA.get("traffic", {})
+    if not t:
+        hour = (time.gmtime().tm_hour + 3) % 24
+        fallback_levels = {0:1,1:1,2:1,3:1,4:1,5:2,6:4,7:7,8:9,9:8,10:5,11:4,12:5,13:5,14:4,15:5,16:7,17:9,18:10,19:8,20:6,21:4,22:3,23:2}
+        t = {"level": fallback_levels.get(hour, 3), "icon": "yellow", "hint": "", "time_msk": "", "multiplier": get_traffic_multiplier(), "source": "fallback"}
+    return jsonify(t)
+
+
 @app.route("/api/demand", methods=["GET"])
 def get_demand():
     return jsonify(DATA["demand"])

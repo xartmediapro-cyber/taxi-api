@@ -277,13 +277,26 @@ def fetch_fuel():
         time.sleep(86400)  # daily
 
 
+# ============ KEEP-ALIVE: prevent Render free tier sleep ============
+def keep_alive():
+    url = os.environ.get("RENDER_EXTERNAL_URL", "https://taxi-api-b4ni.onrender.com")
+    while True:
+        try:
+            req = urllib.request.Request(f"{url}/api/status", headers={"User-Agent": "KeepAlive/1.0"})
+            with urllib.request.urlopen(req, timeout=10, context=CTX) as r:
+                print(f"[KEEPALIVE] ping ok: {r.read().decode()[:50]}")
+        except Exception as e:
+            print(f"[KEEPALIVE ERR] {e}")
+        time.sleep(840)  # every 14 min (Render sleeps after 15)
+
+
 # ============ START BACKGROUND THREADS ============
 def start_fetchers():
-    for fn in [fetch_weather, fetch_demand, fetch_alerts, fetch_events, fetch_fuel]:
+    for fn in [fetch_weather, fetch_demand, fetch_alerts, fetch_events, fetch_fuel, keep_alive]:
         t = threading.Thread(target=fn, daemon=True)
         t.start()
         time.sleep(1)  # stagger starts
-    print("[INIT] All fetchers started")
+    print("[INIT] All fetchers + keep-alive started")
 
 
 # ============ API ROUTES ============

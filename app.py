@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import json, os, time, threading, urllib.request, ssl, random, math
+import json, os, time, threading, urllib.request, ssl, random, math, re
 
 app = Flask(__name__)
 CORS(app)
@@ -11,6 +11,56 @@ DATA = {
 }
 SECRET = os.environ.get("API_SECRET", "taxi2026")
 CTX = ssl.create_default_context()
+
+# Moscow zones with coordinates for order analysis
+ZONES = {
+    "Центр": {"lat": 55.755, "lon": 37.617, "radius": 3.0, "base_coeff": 1.3},
+    "Москва-Сити": {"lat": 55.749, "lon": 37.537, "radius": 1.5, "base_coeff": 1.5},
+    "Шереметьево": {"lat": 55.972, "lon": 37.414, "radius": 3.0, "base_coeff": 1.8},
+    "Домодедово": {"lat": 55.408, "lon": 37.906, "radius": 3.0, "base_coeff": 1.7},
+    "Внуково": {"lat": 55.596, "lon": 37.275, "radius": 2.5, "base_coeff": 1.6},
+    "Вокзалы": {"lat": 55.776, "lon": 37.655, "radius": 2.0, "base_coeff": 1.4},
+    "ТТК Север": {"lat": 55.800, "lon": 37.580, "radius": 3.0, "base_coeff": 1.1},
+    "ТТК Юг": {"lat": 55.710, "lon": 37.620, "radius": 3.0, "base_coeff": 1.1},
+    "МКАД Север": {"lat": 55.880, "lon": 37.550, "radius": 5.0, "base_coeff": 1.0},
+    "МКАД Юг": {"lat": 55.620, "lon": 37.610, "radius": 5.0, "base_coeff": 1.0},
+    "За МКАД": {"lat": 55.750, "lon": 37.620, "radius": 50.0, "base_coeff": 0.8},
+}
+
+# Traffic multipliers by hour (Moscow typical)
+TRAFFIC_MULT = {
+    0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 1.1,
+    6: 1.3, 7: 1.7, 8: 2.0, 9: 1.9, 10: 1.5, 11: 1.4,
+    12: 1.4, 13: 1.5, 14: 1.5, 15: 1.6, 16: 1.7, 17: 2.0,
+    18: 2.1, 19: 1.9, 20: 1.6, 21: 1.3, 22: 1.1, 23: 1.0,
+}
+
+
+# ============ HELPER: distance between coords ============
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+
+def detect_zone(lat, lon):
+    best = "За МКАД"
+    best_dist = 999
+    for name, z in ZONES.items():
+        if name == "За МКАД":
+            continue
+        d = haversine(lat, lon, z["lat"], z["lon"])
+        if d < z["radius"] and d < best_dist:
+            best = name
+            best_dist = d
+    return best
+
+
+def get_traffic_multiplier():
+    hour = (time.gmtime().tm_hour + 3) % 24
+    return TRAFFIC_MULT.get(hour, 1.0)
 
 
 # ============ AUTO-FETCH: WEATHER ============
@@ -38,7 +88,6 @@ def fetch_weather():
                     353: "🌧", 356: "🌧", 359: "🌧", 362: "🌨", 365: "🌨",
                     368: "🌨", 371: "❄️", 386: "⛈", 389: "⛈", 395: "❄️"}
             emoji = emap.get(code, "🌤")
-            # Demand based on weather
             if code in [200, 386, 389, 395] or temp < -15:
                 dt, dc = "Очень высокий спрос", "red"
             elif code in [176, 179, 296, 302, 308, 329, 332, 338] or temp < -5:
@@ -47,7 +96,6 @@ def fetch_weather():
                 dt, dc = "Средний спрос", "yellow"
             else:
                 dt, dc = "Обычный спрос", "green"
-            # Forecast
             fc = []
             for day in w.get("weather", []):
                 for h in day.get("hourly", []):
@@ -66,10 +114,10 @@ def fetch_weather():
                 "updated": time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 3 * 3600))
             }
             DATA["last_update"] = time.time()
-            print(f"[WEATHER] {temp}°C {desc}")
+            print(f"[WEATHER] {temp}C {desc}")
         except Exception as e:
             print(f"[WEATHER ERR] {e}")
-        time.sleep(600)  # every 10 min
+        time.sleep(600)
 
 
 # ============ AUTO-FETCH: DEMAND ============
@@ -77,14 +125,15 @@ def fetch_demand():
     while True:
         try:
             hour = (time.gmtime().tm_hour + 3) % 24
-            weekday = time.gmtime().tm_wday  # 0=Mon, 6=Sun
+            weekday = time.gmtime().tm_wday
             is_weekend = weekday >= 5
+            traffic = get_traffic_multiplier()
             zones = []
             if 7 <= hour <= 9 and not is_weekend:
                 zones = [
-                    {"name": "Спальные районы → Центр", "coefficient": 1.8, "score": 85},
-                    {"name": "Метро (кольцевая)", "coefficient": 1.5, "score": 70},
-                    {"name": "Железнодорожные вокзалы", "coefficient": 1.6, "score": 75},
+                    {"name": "Спальные районы → Центр", "coefficient": round(1.5 * traffic / 1.5, 1), "score": 85},
+                    {"name": "Метро (кольцевая)", "coefficient": round(1.3 * traffic / 1.5, 1), "score": 70},
+                    {"name": "Железнодорожные вокзалы", "coefficient": round(1.4 * traffic / 1.5, 1), "score": 75},
                     {"name": "Аэропорт Домодедово", "coefficient": 1.4, "score": 65},
                     {"name": "Аэропорт Шереметьево", "coefficient": 1.5, "score": 72},
                 ]
@@ -97,8 +146,8 @@ def fetch_demand():
                 ]
             elif 17 <= hour <= 20:
                 zones = [
-                    {"name": "Центр → Спальные районы", "coefficient": 1.9, "score": 90},
-                    {"name": "Деловые центры (Сити)", "coefficient": 2.0, "score": 92},
+                    {"name": "Центр → Спальные районы", "coefficient": round(1.5 * traffic / 1.5, 1), "score": 90},
+                    {"name": "Деловые центры (Сити)", "coefficient": round(1.6 * traffic / 1.5, 1), "score": 92},
                     {"name": "ТЦ МЕГА, Авиапарк", "coefficient": 1.6, "score": 75},
                     {"name": "Аэропорт Внуково", "coefficient": 1.7, "score": 80},
                     {"name": "Аэропорт Шереметьево", "coefficient": 1.8, "score": 83},
@@ -120,16 +169,18 @@ def fetch_demand():
                     {"name": "ТЦ и торговые зоны", "coefficient": 1.1, "score": 48},
                     {"name": "Спальные районы", "coefficient": 1.0, "score": 40},
                 ]
-            # Add slight randomness for realism
             for z in zones:
                 z["coefficient"] = round(z["coefficient"] + random.uniform(-0.1, 0.1), 1)
                 z["score"] = max(10, min(100, z["score"] + random.randint(-5, 5)))
+            # Add traffic info
+            for z in zones:
+                z["traffic_multiplier"] = traffic
             DATA["demand"] = sorted(zones, key=lambda x: -x["score"])
             DATA["last_update"] = time.time()
-            print(f"[DEMAND] {hour}:00 MSK, {len(zones)} zones")
+            print(f"[DEMAND] {hour}:00 MSK, traffic={traffic}x, {len(zones)} zones")
         except Exception as e:
             print(f"[DEMAND ERR] {e}")
-        time.sleep(300)  # every 5 min
+        time.sleep(300)
 
 
 # ============ AUTO-FETCH: DPS / ALERTS ============
@@ -137,9 +188,7 @@ def fetch_alerts():
     while True:
         try:
             hour = (time.gmtime().tm_hour + 3) % 24
-            now = time.strftime("%H:%M", time.gmtime(time.time() + 3 * 3600))
             alerts = []
-            # DPS patrol locations - rotate based on time
             dps_locations = [
                 ("Садовое кольцо / Новинский бульвар", 55.752, 37.581),
                 ("Ленинградское шоссе / МКАД", 55.876, 37.468),
@@ -152,67 +201,59 @@ def fetch_alerts():
                 ("МКАД 25-й км (внутр.)", 55.720, 37.380),
                 ("МКАД 65-й км (внешн.)", 55.620, 37.750),
                 ("Каширское шоссе / Домодедово", 55.580, 37.680),
-                ("Ленинский проспект / Площадь Гагарина", 55.710, 37.590),
+                ("Ленинский проспект / пл. Гагарина", 55.710, 37.590),
             ]
-            # Select 3-5 based on hour
             random.seed(int(time.time()) // 1800)
             count = random.randint(3, 5)
             selected = random.sample(dps_locations, min(count, len(dps_locations)))
             for loc_name, lat, lon in selected:
                 t = random.randint(max(0, hour - 2), hour)
                 alerts.append({
-                    "type": "dps",
-                    "text": f"Патруль ДПС: {loc_name}",
+                    "type": "dps", "text": f"Патруль ДПС: {loc_name}",
                     "time": f"{t:02d}:{random.randint(0,59):02d}",
                     "location": loc_name.split("/")[0].strip(),
-                    "source": random.choice(["Telegram", "Waze", "Пользователь"])
+                    "source": random.choice(["Telegram", "Waze", "Пользователь"]),
+                    "lat": lat, "lon": lon
                 })
-            # Speed cameras - always present
             cameras = [
-                "МКАД 45-50 км (камера скорости)",
-                "ТТК Беговая (камера контроля полосы)",
-                "Кутузовский проспект (камера скорости)",
-                "Ленинградское шоссе (камера средней скорости)",
+                ("МКАД 45-50 км (камера скорости)", 55.690, 37.430),
+                ("ТТК Беговая (камера контроля полосы)", 55.773, 37.556),
+                ("Кутузовский проспект (камера скорости)", 55.740, 37.530),
+                ("Ленинградское шоссе (камера средней скорости)", 55.850, 37.470),
             ]
             random.seed(int(time.time()) // 3600)
-            for cam in random.sample(cameras, random.randint(2, 3)):
+            for cam_name, lat, lon in random.sample(cameras, random.randint(2, 3)):
                 alerts.append({
-                    "type": "camera",
-                    "text": cam,
-                    "time": "00:00",
-                    "location": cam.split("(")[0].strip(),
-                    "source": "Автоматически"
+                    "type": "camera", "text": cam_name, "time": "00:00",
+                    "location": cam_name.split("(")[0].strip(),
+                    "source": "Автоматически", "lat": lat, "lon": lon
                 })
             DATA["alerts"] = alerts
             DATA["last_update"] = time.time()
             print(f"[ALERTS] {len(alerts)} alerts")
         except Exception as e:
             print(f"[ALERTS ERR] {e}")
-        time.sleep(1800)  # every 30 min
+        time.sleep(1800)
 
 
-# ============ AUTO-FETCH: EVENTS ============
+# ============ AUTO-FETCH: EVENTS (1x/day — KudaGo + Yandex Afisha) ============
 def fetch_events():
     while True:
         try:
-            hour = (time.gmtime().tm_hour + 3) % 24
-            weekday = time.gmtime().tm_wday
-            today = time.strftime("%d.%m", time.gmtime(time.time() + 3 * 3600))
             events = []
-            # Fetch from Kudago API (free, no key needed)
+            # --- KudaGo API ---
             try:
                 ts = int(time.time())
-                url = f"https://kudago.com/public-api/v1.4/events/?location=msk&actual_since={ts}&page_size=8&fields=title,place,dates&text_format=text"
+                url = f"https://kudago.com/public-api/v1.4/events/?location=msk&actual_since={ts}&page_size=10&fields=title,place,dates&text_format=text"
                 req = urllib.request.Request(url, headers={"User-Agent": "TaxiAssistant/1.0"})
-                with urllib.request.urlopen(req, timeout=10, context=CTX) as r:
+                with urllib.request.urlopen(req, timeout=15, context=CTX) as r:
                     data = json.loads(r.read())
                 for ev in data.get("results", [])[:6]:
                     title = ev.get("title", "Событие")
                     place = ev.get("place", {})
                     venue = place.get("title", "Москва") if isinstance(place, dict) else "Москва"
                     dates = ev.get("dates", [{}])
-                    start = ""
-                    end = ""
+                    start, end = "", ""
                     if dates:
                         s = dates[0].get("start")
                         e = dates[0].get("end")
@@ -221,32 +262,67 @@ def fetch_events():
                         if e:
                             end = time.strftime("%H:%M", time.gmtime(e + 3 * 3600))
                     events.append({
-                        "name": title[:60],
-                        "venue": (venue or "Москва")[:40],
-                        "start": start or "19:00",
-                        "end": end or "22:00",
-                        "hot": len(events) < 3
+                        "name": title[:60], "venue": (venue or "Москва")[:40],
+                        "start": start or "19:00", "end": end or "22:00",
+                        "hot": len(events) < 3, "source": "KudaGo"
                     })
                 print(f"[EVENTS] KudaGo: {len(events)} events")
             except Exception as e2:
-                print(f"[EVENTS] KudaGo failed: {e2}, using defaults")
+                print(f"[EVENTS] KudaGo failed: {e2}")
+
+            # --- Yandex Afisha API ---
+            try:
+                today = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 3 * 3600))
+                afisha_url = f"https://afisha.yandex.ru/api/events/rubric/main?city=moscow&period={today}&limit=10&offset=0"
+                req = urllib.request.Request(afisha_url, headers={
+                    "User-Agent": "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36",
+                    "Accept": "application/json",
+                    "Referer": "https://afisha.yandex.ru/moscow"
+                })
+                with urllib.request.urlopen(req, timeout=15, context=CTX) as r:
+                    adata = json.loads(r.read())
+                for item in adata.get("data", [])[:5]:
+                    ev = item.get("event", {})
+                    title = ev.get("title", "")
+                    # Get venue from scheduleInfo
+                    si = item.get("scheduleInfo", {})
+                    place_name = ""
+                    places = si.get("placePreview", si.get("places", []))
+                    if isinstance(places, list) and places:
+                        place_name = places[0].get("title", "Москва")
+                    elif isinstance(places, dict):
+                        place_name = places.get("title", "Москва")
+                    dates_text = si.get("dates", "")
+                    if title and title not in [e["name"] for e in events]:
+                        events.append({
+                            "name": title[:60], "venue": (place_name or "Москва")[:40],
+                            "start": "19:00", "end": "22:00",
+                            "hot": False, "source": "Яндекс.Афиша"
+                        })
+                print(f"[EVENTS] Yandex Afisha: added events, total={len(events)}")
+            except Exception as e3:
+                print(f"[EVENTS] Yandex Afisha failed: {e3}")
+
+            # Fallback if both failed
+            if not events:
                 events = [
-                    {"name": "Концерты и шоу", "venue": "Крокус Сити Холл", "start": "19:00", "end": "22:00", "hot": True},
-                    {"name": "Театральный вечер", "venue": "Большой театр", "start": "19:30", "end": "22:30", "hot": True},
-                    {"name": "Выставка современного искусства", "venue": "Третьяковка", "start": "10:00", "end": "20:00", "hot": False},
+                    {"name": "Концерты и шоу", "venue": "Крокус Сити Холл", "start": "19:00", "end": "22:00", "hot": True, "source": "default"},
+                    {"name": "Театральный вечер", "venue": "Большой театр", "start": "19:30", "end": "22:30", "hot": True, "source": "default"},
+                    {"name": "Выставка", "venue": "Третьяковка", "start": "10:00", "end": "20:00", "hot": False, "source": "default"},
                 ]
+
             DATA["events"] = events
             DATA["last_update"] = time.time()
+            print(f"[EVENTS] Total: {len(events)} events")
         except Exception as e:
             print(f"[EVENTS ERR] {e}")
-        time.sleep(3600)  # every hour
+        time.sleep(86400)  # 1x per day
 
 
 # ============ AUTO-FETCH: FUEL ============
 def fetch_fuel():
     while True:
         try:
-            # Real average Moscow fuel prices (updated monthly)
             base_prices = {"p92": 54.5, "p95": 60.0, "dt": 63.0, "gas": 32.5}
             stations = [
                 {"name": "Лукойл", "address": "ул. Тверская, 15", "lat": 55.764, "lon": 37.605, "mod": 0.4},
@@ -260,10 +336,8 @@ def fetch_fuel():
             fuel = []
             for s in stations:
                 fuel.append({
-                    "name": s["name"],
-                    "address": s["address"],
-                    "lat": s["lat"],
-                    "lon": s["lon"],
+                    "name": s["name"], "address": s["address"],
+                    "lat": s["lat"], "lon": s["lon"],
                     "p92": round(base_prices["p92"] + s["mod"], 2),
                     "p95": round(base_prices["p95"] + s["mod"], 2),
                     "dt": round(base_prices["dt"] + s["mod"], 2),
@@ -274,20 +348,20 @@ def fetch_fuel():
             print(f"[FUEL] {len(fuel)} stations")
         except Exception as e:
             print(f"[FUEL ERR] {e}")
-        time.sleep(86400)  # daily
+        time.sleep(86400)
 
 
-# ============ KEEP-ALIVE: prevent Render free tier sleep ============
+# ============ KEEP-ALIVE ============
 def keep_alive():
     url = os.environ.get("RENDER_EXTERNAL_URL", "https://taxi-api-b4ni.onrender.com")
     while True:
         try:
             req = urllib.request.Request(f"{url}/api/status", headers={"User-Agent": "KeepAlive/1.0"})
             with urllib.request.urlopen(req, timeout=10, context=CTX) as r:
-                print(f"[KEEPALIVE] ping ok: {r.read().decode()[:50]}")
-        except Exception as e:
-            print(f"[KEEPALIVE ERR] {e}")
-        time.sleep(840)  # every 14 min (Render sleeps after 15)
+                r.read()
+        except:
+            pass
+        time.sleep(840)
 
 
 # ============ START BACKGROUND THREADS ============
@@ -295,7 +369,7 @@ def start_fetchers():
     for fn in [fetch_weather, fetch_demand, fetch_alerts, fetch_events, fetch_fuel, keep_alive]:
         t = threading.Thread(target=fn, daemon=True)
         t.start()
-        time.sleep(1)  # stagger starts
+        time.sleep(1)
     print("[INIT] All fetchers + keep-alive started")
 
 
@@ -328,7 +402,168 @@ def get_status():
                     "events_count": len(DATA["events"]),
                     "alerts_count": len(DATA["alerts"]),
                     "demand_count": len(DATA["demand"]),
-                    "fuel_count": len(DATA["fuel"])})
+                    "fuel_count": len(DATA["fuel"]),
+                    "traffic_multiplier": get_traffic_multiplier()})
+
+
+# ============ ORDER ANALYSIS ============
+@app.route("/api/analyze_order", methods=["POST"])
+def analyze_order():
+    """
+    Analyze a taxi order. Input JSON:
+    {
+        "pickup_lat": 55.75, "pickup_lon": 37.62,
+        "dropoff_lat": 55.97, "dropoff_lon": 37.41,
+        "price": 1500,           # offered price in rubles
+        "pickup_address": "...", # optional text
+        "dropoff_address": "..." # optional text
+    }
+    Returns recommendation: take/skip/consider with analysis.
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "no json"}), 400
+
+    plat = data.get("pickup_lat", 0)
+    plon = data.get("pickup_lon", 0)
+    dlat = data.get("dropoff_lat", 0)
+    dlon = data.get("dropoff_lon", 0)
+    price = data.get("price", 0)
+    pickup_addr = data.get("pickup_address", "")
+    dropoff_addr = data.get("dropoff_address", "")
+
+    # --- Distance (straight line * 1.4 for road factor) ---
+    straight_km = haversine(plat, plon, dlat, dlon)
+    road_km = round(straight_km * 1.4, 1)
+
+    # --- Traffic ---
+    traffic = get_traffic_multiplier()
+    hour = (time.gmtime().tm_hour + 3) % 24
+    base_speed = 35  # km/h average Moscow
+    effective_speed = base_speed / traffic
+    duration_min = round((road_km / effective_speed) * 60)
+
+    # --- Zones ---
+    pickup_zone = detect_zone(plat, plon) if plat else "Неизвестно"
+    dropoff_zone = detect_zone(dlat, dlon) if dlat else "Неизвестно"
+
+    # --- Dropoff zone demand (will I get order there?) ---
+    dropoff_coeff = ZONES.get(dropoff_zone, {}).get("base_coeff", 1.0)
+    # Adjust for time of day
+    if 22 <= hour or hour <= 4:
+        if "Центр" in dropoff_zone or "Сити" in dropoff_zone:
+            dropoff_coeff *= 1.3
+    elif 7 <= hour <= 9:
+        if "Центр" in dropoff_zone or "Сити" in dropoff_zone:
+            dropoff_coeff *= 1.4
+
+    # --- Fair price estimate ---
+    # Base: 100₽ start + 15₽/km + time penalty in traffic
+    fair_price = round(100 + road_km * 15 * traffic * 0.7 + duration_min * 3)
+
+    # --- Rubles per km ---
+    rub_per_km = round(price / road_km, 1) if road_km > 0 else 0
+
+    # --- Rubles per minute ---
+    rub_per_min = round(price / duration_min, 1) if duration_min > 0 else 0
+
+    # --- DPS on route ---
+    dps_on_route = []
+    for alert in DATA.get("alerts", []):
+        if alert.get("type") == "dps" and alert.get("lat"):
+            # Check if DPS is within 2km of route line
+            alat, alon = alert["lat"], alert["lon"]
+            d_to_pickup = haversine(plat, plon, alat, alon)
+            d_to_dropoff = haversine(dlat, dlon, alat, alon)
+            if d_to_pickup < road_km * 0.8 or d_to_dropoff < road_km * 0.8:
+                dps_on_route.append(alert["text"])
+
+    # --- Recommendation ---
+    score = 50  # neutral
+    reasons = []
+
+    # Price vs fair
+    if price >= fair_price * 1.2:
+        score += 25
+        reasons.append(f"💰 Цена выше рынка: {price}₽ vs ~{fair_price}₽")
+    elif price >= fair_price * 0.9:
+        score += 10
+        reasons.append(f"💵 Цена в рынке: {price}₽ vs ~{fair_price}₽")
+    else:
+        score -= 20
+        reasons.append(f"⚠️ Цена ниже рынка: {price}₽ vs ~{fair_price}₽")
+
+    # Rub/km efficiency
+    if rub_per_km >= 25:
+        score += 15
+        reasons.append(f"✅ Хороший ₽/км: {rub_per_km}₽/км")
+    elif rub_per_km >= 15:
+        score += 5
+        reasons.append(f"📊 Нормальный ₽/км: {rub_per_km}₽/км")
+    else:
+        score -= 15
+        reasons.append(f"❌ Низкий ₽/км: {rub_per_km}₽/км")
+
+    # Dropoff zone (will I get next order?)
+    if dropoff_coeff >= 1.5:
+        score += 15
+        reasons.append(f"🟢 Высокий спрос на точке Б ({dropoff_zone})")
+    elif dropoff_coeff >= 1.2:
+        score += 5
+        reasons.append(f"🟡 Средний спрос на точке Б ({dropoff_zone})")
+    else:
+        score -= 10
+        reasons.append(f"🔴 Низкий спрос на точке Б ({dropoff_zone})")
+
+    # Traffic penalty
+    if traffic >= 1.8:
+        score -= 10
+        reasons.append(f"🚗 Пробки {traffic}x — потеря времени")
+    elif traffic <= 1.2:
+        score += 5
+        reasons.append(f"🛣 Свободные дороги ({traffic}x)")
+
+    # Airport bonus
+    if "аэропорт" in dropoff_zone.lower() or "Шереметьево" in dropoff_zone or "Домодедово" in dropoff_zone or "Внуково" in dropoff_zone:
+        score += 10
+        reasons.append("✈️ Бонус за аэропорт — обратный заказ почти гарантирован")
+
+    # DPS warning
+    if dps_on_route:
+        reasons.append(f"🚔 ДПС на маршруте: {', '.join(dps_on_route[:2])}")
+
+    # Final decision
+    score = max(0, min(100, score))
+    if score >= 70:
+        recommendation = "БРАТЬ"
+        color = "green"
+    elif score >= 45:
+        recommendation = "НА УСМОТРЕНИЕ"
+        color = "yellow"
+    else:
+        recommendation = "ПРОПУСТИТЬ"
+        color = "red"
+
+    return jsonify({
+        "recommendation": recommendation,
+        "score": score,
+        "color": color,
+        "reasons": reasons,
+        "analysis": {
+            "distance_km": road_km,
+            "duration_min": duration_min,
+            "traffic": traffic,
+            "pickup_zone": pickup_zone,
+            "dropoff_zone": dropoff_zone,
+            "price": price,
+            "fair_price": fair_price,
+            "rub_per_km": rub_per_km,
+            "rub_per_min": rub_per_min,
+            "dropoff_demand": round(dropoff_coeff, 1),
+            "dps_on_route": dps_on_route
+        }
+    })
+
 
 @app.route("/api/push", methods=["POST"])
 def push_data():
@@ -346,13 +581,12 @@ def push_data():
 
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({"service": "Taxi Assistant API",
-                    "auto_update": True,
+    return jsonify({"service": "Taxi Assistant API", "auto_update": True,
                     "endpoints": ["/api/weather", "/api/events", "/api/alerts",
-                                  "/api/demand", "/api/fuel", "/api/status"]})
+                                  "/api/demand", "/api/fuel", "/api/status",
+                                  "/api/analyze_order"]})
 
 
-# Start fetchers when app loads
 start_fetchers()
 
 if __name__ == "__main__":

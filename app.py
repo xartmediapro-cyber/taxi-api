@@ -6,8 +6,16 @@ app = Flask(__name__)
 CORS(app)
 
 DATA = {
-    "weather": {}, "events": [], "alerts": [],
-    "demand": [], "fuel": [], "last_update": 0
+    "weather": {}, "alerts": [],
+    "demand": [], "fuel": [], "last_update": 0,
+    "events": [
+        {"name": "Мюзикл «Вальс-бостон»", "venue": "Москвич", "address": "Волгоградский просп., 46/15", "lat": 55.716, "lon": 37.735, "start": "19:00", "end": "22:00", "date": "сегодня", "hot": True, "source": "Яндекс.Афиша"},
+        {"name": "Женский стендап. Большой концерт", "venue": "Live Арена", "address": "просп. Мира, 119", "lat": 55.830, "lon": 37.638, "start": "20:00", "end": "22:30", "date": "27 марта", "hot": True, "source": "Яндекс.Афиша"},
+        {"name": "Ничего не бойся, я с тобой", "venue": "Московский дворец молодёжи", "address": "Комсомольский просп., 28", "lat": 55.733, "lon": 37.581, "start": "19:00", "end": "21:30", "date": "11 апреля", "hot": True, "source": "Яндекс.Афиша"},
+        {"name": "Балет «Лебединое озеро»", "venue": "Большой театр", "address": "Театральная пл., 1", "lat": 55.760, "lon": 37.619, "start": "19:30", "end": "22:30", "date": "", "hot": True, "source": "Афиша"},
+        {"name": "Концерт в Зарядье", "venue": "Зарядье", "address": "ул. Варварка, 6", "lat": 55.750, "lon": 37.629, "start": "20:00", "end": "22:30", "date": "", "hot": False, "source": "Афиша"},
+        {"name": "Стендап-вечер", "venue": "StandUp Club #1", "address": "Нижний Сусальный пер., 5", "lat": 55.756, "lon": 37.661, "start": "20:00", "end": "23:00", "date": "", "hot": False, "source": "Афиша"},
+    ]
 }
 SECRET = os.environ.get("API_SECRET", "taxi2026")
 CTX = ssl.create_default_context()

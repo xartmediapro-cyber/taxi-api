@@ -236,12 +236,120 @@ def fetch_alerts():
         time.sleep(1800)
 
 
-# ============ AUTO-FETCH: EVENTS (2x/day — KudaGo + fallback) ============
+# ============ VENUE ADDRESS DICTIONARY ============
+VENUE_DATA = {
+    "москвич": {"address": "ул. Волгоградский просп., 46/15", "lat": 55.716, "lon": 37.735},
+    "live арена": {"address": "просп. Мира, 119", "lat": 55.830, "lon": 37.638},
+    "московский дворец молодёжи": {"address": "ул. Комсомольский просп., 28", "lat": 55.733, "lon": 37.581},
+    "большой театр": {"address": "Театральная пл., 1", "lat": 55.760, "lon": 37.619},
+    "кремлёвский дворец": {"address": "Кремль", "lat": 55.750, "lon": 37.615},
+    "крокус сити холл": {"address": "МКАД 65-66 км, Красногорск", "lat": 55.820, "lon": 37.385},
+    "мхт им. чехова": {"address": "Камергерский пер., 3", "lat": 55.760, "lon": 37.613},
+    "стадион лужники": {"address": "ул. Лужники, 24", "lat": 55.716, "lon": 37.554},
+    "олимпийский": {"address": "Олимпийский просп., 16", "lat": 55.783, "lon": 37.635},
+    "мегаспорт": {"address": "Ходынский бул., 3", "lat": 55.785, "lon": 37.533},
+    "цска арена": {"address": "Ленинградский просп., 39", "lat": 55.791, "lon": 37.537},
+    "вегас сити холл": {"address": "МКАД 24 км, ТРЦ Вегас", "lat": 55.618, "lon": 37.720},
+    "зарядье": {"address": "ул. Варварка, 6", "lat": 55.750, "lon": 37.629},
+    "третьяковская галерея": {"address": "Лаврушинский пер., 10", "lat": 55.741, "lon": 37.620},
+    "пушкинский музей": {"address": "ул. Волхонка, 12", "lat": 55.747, "lon": 37.605},
+    "мдм": {"address": "Комсомольский просп., 28", "lat": 55.733, "lon": 37.581},
+    "театр оперетты": {"address": "ул. Б. Дмитровка, 6", "lat": 55.763, "lon": 37.613},
+    "клуб козлова": {"address": "ул. Маросейка, 9/2", "lat": 55.758, "lon": 37.637},
+    "adrenaline stadium": {"address": "Ленинградский просп., 80", "lat": 55.809, "lon": 37.510},
+    "вднх": {"address": "просп. Мира, 119", "lat": 55.830, "lon": 37.638},
+    "depо": {"address": "Лесная ул., 20", "lat": 55.784, "lon": 37.588},
+    "гбкз зарядье": {"address": "ул. Варварка, 6", "lat": 55.750, "lon": 37.629},
+    "цветной": {"address": "Цветной бул., 13", "lat": 55.771, "lon": 37.621},
+    "standup club #1": {"address": "Нижний Сусальный пер., 5", "lat": 55.756, "lon": 37.661},
+    "известия hall": {"address": "Пушкинская пл., 5", "lat": 55.765, "lon": 37.606},
+    "главclub green concert": {"address": "ул. Орджоникидзе, 11", "lat": 55.706, "lon": 37.598},
+    "б1 maximum": {"address": "ул. Орджоникидзе, 11", "lat": 55.706, "lon": 37.598},
+    "барвиха luxury village": {"address": "Рублёво-Успенское ш., 114", "lat": 55.739, "lon": 37.266},
+}
+
+def get_venue_info(venue_name):
+    """Get address and coords for a venue"""
+    vn = venue_name.lower().strip()
+    for key, data in VENUE_DATA.items():
+        if key in vn or vn in key:
+            return data
+    return None
+
+
+# ============ AUTO-FETCH: EVENTS (2x/day — Yandex Afisha + KudaGo) ============
 def fetch_events():
     while True:
         try:
             events = []
-            # --- KudaGo API (with retry) ---
+            seen_titles = set()
+
+            # --- 1. Yandex Afisha (scrape HTML) ---
+            try:
+                req = urllib.request.Request("https://afisha.yandex.ru/moscow", headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept-Language": "ru-RU,ru;q=0.9",
+                })
+                with urllib.request.urlopen(req, timeout=20, context=CTX) as r:
+                    html = r.read().decode("utf-8", errors="replace")
+
+                if "Подтвердите" not in html:
+                    # Clean HTML tags, extract text
+                    clean = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.S)
+                    clean = re.sub(r'<style[^>]*>.*?</style>', '', clean, flags=re.S)
+                    text = re.sub(r'</?(div|p|h[1-6]|li|section|article|header|span|a|img|picture|source|svg|path|circle|button|figure|figcaption|label|input|form|nav|footer|main|aside|ul|ol|dl|dt|dd|table|tr|td|th|meta|link|noscript)[^>]*>', '\n', clean)
+                    text = re.sub(r'<[^>]+>', '', text)
+                    text = re.sub(r'[ \t]+', ' ', text)
+                    lines = [l.strip() for l in text.split('\n') if l.strip() and len(l.strip()) > 2]
+
+                    for i, line in enumerate(lines):
+                        # Find "Venue • Date" pattern
+                        m = re.match(r'^(.{3,40})\s*[•·]\s*(.*(?:сегодня|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря|\d{1,2}:\d{2}).*)$', line)
+                        if m:
+                            venue = m.group(1).strip()
+                            date_str = m.group(2).strip()
+                            # Find event title — look backwards for a non-trivial line
+                            title = ""
+                            for j in range(i - 1, max(0, i - 5), -1):
+                                pv = lines[j]
+                                if (pv and len(pv) > 4 and
+                                    not pv.startswith('от ') and
+                                    'Выбрать' not in pv and
+                                    'Все события' not in pv and
+                                    not re.match(r'^[\d\s₽%•·]+$', pv) and
+                                    '•' not in pv):
+                                    title = pv
+                                    break
+
+                            if title and title not in seen_titles and len(venue) > 2:
+                                seen_titles.add(title)
+                                vi = get_venue_info(venue)
+                                # Parse time from date string (e.g. "27 марта, 20:00")
+                                time_m = re.search(r'(\d{1,2}:\d{2})', date_str)
+                                start_time = time_m.group(1) if time_m else "19:00"
+                                # Estimate end time (+2.5h)
+                                sh = int(start_time.split(':')[0])
+                                end_time = f"{(sh + 2) % 24:02d}:30"
+
+                                events.append({
+                                    "name": title[:60],
+                                    "venue": venue[:40],
+                                    "address": vi["address"] if vi else "",
+                                    "lat": vi["lat"] if vi else 0,
+                                    "lon": vi["lon"] if vi else 0,
+                                    "start": start_time,
+                                    "end": end_time,
+                                    "date": date_str[:25],
+                                    "hot": True,
+                                    "source": "Яндекс.Афиша"
+                                })
+                    print(f"[EVENTS] Yandex Afisha: {len(events)} events")
+                else:
+                    print("[EVENTS] Yandex Afisha: CAPTCHA")
+            except Exception as e1:
+                print(f"[EVENTS] Yandex Afisha failed: {e1}")
+
+            # --- 2. KudaGo API (with retry) ---
             for attempt in range(3):
                 try:
                     ts = int(time.time())
@@ -251,6 +359,9 @@ def fetch_events():
                         data = json.loads(r.read())
                     for ev in data.get("results", [])[:8]:
                         title = ev.get("title", "Событие")
+                        if title in seen_titles:
+                            continue
+                        seen_titles.add(title)
                         place = ev.get("place", {})
                         venue = place.get("title", "Москва") if isinstance(place, dict) else "Москва"
                         dates = ev.get("dates", [{}])
@@ -262,43 +373,43 @@ def fetch_events():
                                 start = time.strftime("%H:%M", time.gmtime(s + 3 * 3600))
                             if e:
                                 end = time.strftime("%H:%M", time.gmtime(e + 3 * 3600))
+                        vi = get_venue_info(venue)
                         events.append({
-                            "name": title[:60], "venue": (venue or "Москва")[:40],
-                            "start": start or "19:00", "end": end or "22:00",
-                            "hot": len(events) < 3, "source": "KudaGo"
+                            "name": title[:60],
+                            "venue": (venue or "Москва")[:40],
+                            "address": vi["address"] if vi else "",
+                            "lat": vi["lat"] if vi else 0,
+                            "lon": vi["lon"] if vi else 0,
+                            "start": start or "19:00",
+                            "end": end or "22:00",
+                            "date": "",
+                            "hot": len([e for e in events if e.get("source") == "KudaGo"]) < 2,
+                            "source": "KudaGo"
                         })
-                    print(f"[EVENTS] KudaGo OK: {len(events)} events (attempt {attempt+1})")
+                    print(f"[EVENTS] KudaGo: total now {len(events)} (attempt {attempt+1})")
                     break
                 except Exception as e2:
                     print(f"[EVENTS] KudaGo attempt {attempt+1} failed: {e2}")
                     if attempt < 2:
                         time.sleep(10)
 
-            # --- Fallback: rich Moscow events that rotate daily ---
+            # --- 3. Fallback if both sources failed ---
             if not events:
                 print("[EVENTS] Using fallback events")
                 day = int(time.time()) // 86400
                 all_events = [
-                    {"name": "Спектакль «Мастер и Маргарита»", "venue": "МХТ им. Чехова", "start": "19:00", "end": "22:00", "hot": True},
-                    {"name": "Балет «Лебединое озеро»", "venue": "Большой театр", "start": "19:30", "end": "22:30", "hot": True},
-                    {"name": "Концерт «Симфоническая ночь»", "venue": "Зарядье (концертный зал)", "start": "20:00", "end": "22:30", "hot": True},
-                    {"name": "Ледовое шоу Навки", "venue": "Мегаспорт", "start": "18:00", "end": "20:30", "hot": True},
-                    {"name": "Выставка «Москва в лицах»", "venue": "Третьяковская галерея", "start": "10:00", "end": "20:00", "hot": False},
-                    {"name": "Стендап-вечер", "venue": "StandUp Club #1", "start": "20:00", "end": "23:00", "hot": False},
-                    {"name": "Мюзикл «Призрак оперы»", "venue": "МДМ", "start": "19:00", "end": "22:00", "hot": True},
-                    {"name": "Фуд-маркет", "venue": "ДЕПО Москва", "start": "10:00", "end": "23:00", "hot": False},
-                    {"name": "Матч КХЛ: ЦСКА", "venue": "ЦСКА Арена", "start": "19:30", "end": "22:00", "hot": True},
-                    {"name": "Цирк Никулина", "venue": "Цветной бульвар", "start": "15:00", "end": "17:30", "hot": False},
-                    {"name": "Выставка Кандинского", "venue": "Пушкинский музей", "start": "10:00", "end": "19:00", "hot": False},
-                    {"name": "Рок-фестиваль", "venue": "Adrenaline Stadium", "start": "18:00", "end": "23:00", "hot": True},
-                    {"name": "Оперетта «Летучая мышь»", "venue": "Театр оперетты", "start": "19:00", "end": "21:30", "hot": False},
-                    {"name": "Экскурсия по крышам", "venue": "Центр Москвы", "start": "12:00", "end": "14:00", "hot": False},
-                    {"name": "Джазовый вечер", "venue": "Клуб Козлова", "start": "20:00", "end": "23:00", "hot": False},
+                    {"name": "Спектакль «Мастер и Маргарита»", "venue": "МХТ им. Чехова", "address": "Камергерский пер., 3", "lat": 55.760, "lon": 37.613, "start": "19:00", "end": "22:00", "hot": True},
+                    {"name": "Балет «Лебединое озеро»", "venue": "Большой театр", "address": "Театральная пл., 1", "lat": 55.760, "lon": 37.619, "start": "19:30", "end": "22:30", "hot": True},
+                    {"name": "Концерт «Симфоническая ночь»", "venue": "Зарядье", "address": "ул. Варварка, 6", "lat": 55.750, "lon": 37.629, "start": "20:00", "end": "22:30", "hot": True},
+                    {"name": "Ледовое шоу", "venue": "Мегаспорт", "address": "Ходынский бул., 3", "lat": 55.785, "lon": 37.533, "start": "18:00", "end": "20:30", "hot": True},
+                    {"name": "Мюзикл «Призрак оперы»", "venue": "МДМ", "address": "Комсомольский просп., 28", "lat": 55.733, "lon": 37.581, "start": "19:00", "end": "22:00", "hot": True},
+                    {"name": "Стендап-вечер", "venue": "StandUp Club #1", "address": "Нижний Сусальный пер., 5", "lat": 55.756, "lon": 37.661, "start": "20:00", "end": "23:00", "hot": False},
                 ]
                 random.seed(day)
-                selected = random.sample(all_events, min(6, len(all_events)))
+                selected = random.sample(all_events, min(5, len(all_events)))
                 for ev in selected:
                     ev["source"] = "Афиша"
+                    ev["date"] = ""
                 events = selected
 
             DATA["events"] = events
@@ -306,7 +417,7 @@ def fetch_events():
             print(f"[EVENTS] Total: {len(events)} events")
         except Exception as e:
             print(f"[EVENTS ERR] {e}")
-        time.sleep(43200)  # 2x per day (12 hours)
+        time.sleep(43200)  # 2x per day
 
 
 # ============ AUTO-FETCH: FUEL ============

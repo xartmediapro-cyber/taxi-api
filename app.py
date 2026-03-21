@@ -35,13 +35,19 @@ ZONES = {
     "За МКАД": {"lat": 55.750, "lon": 37.620, "radius": 50.0, "base_coeff": 0.8},
 }
 
-# Traffic multipliers by hour (Moscow typical)
-TRAFFIC_MULT = {
+# Traffic fallback by hour (used if Yandex API fails)
+TRAFFIC_MULT_FALLBACK = {
     0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 1.1,
     6: 1.3, 7: 1.7, 8: 2.0, 9: 1.9, 10: 1.5, 11: 1.4,
     12: 1.4, 13: 1.5, 14: 1.5, 15: 1.6, 16: 1.7, 17: 2.0,
     18: 2.1, 19: 1.9, 20: 1.6, 21: 1.3, 22: 1.1, 23: 1.0,
 }
+
+# Real-time traffic data from Yandex
+TRAFFIC_DATA = {"level": 0, "icon": "green", "hint": "", "time": "", "multiplier": 1.0}
+
+# Level → multiplier mapping (1-10 scale → coefficient)
+LEVEL_TO_MULT = {0: 1.0, 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.4, 5: 1.5, 6: 1.7, 7: 1.9, 8: 2.1, 9: 2.3, 10: 2.5}
 
 
 # ============ HELPER: distance between coords ============
@@ -67,8 +73,56 @@ def detect_zone(lat, lon):
 
 
 def get_traffic_multiplier():
+    """Return real traffic multiplier from Yandex, fallback to time-based"""
+    if TRAFFIC_DATA["level"] > 0:
+        return TRAFFIC_DATA["multiplier"]
     hour = (time.gmtime().tm_hour + 3) % 24
-    return TRAFFIC_MULT.get(hour, 1.0)
+    return TRAFFIC_MULT_FALLBACK.get(hour, 1.0)
+
+
+# ============ AUTO-FETCH: REAL TRAFFIC from Yandex ============
+def fetch_traffic():
+    while True:
+        try:
+            req = urllib.request.Request(
+                "https://export.yandex.ru/bar/reginfo.xml?region=213",
+                headers={"User-Agent": "TaxiAssistant/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=15, context=CTX) as r:
+                xml = r.read().decode("utf-8", errors="replace")
+            # Parse traffic level from XML
+            level_m = re.search(r"<level>(\d+)</level>", xml)
+            icon_m = re.search(r"<icon>(\w+)</icon>", xml)
+            hint_m = re.search(r'<hint lang="ru">(.*?)</hint>', xml, re.S)
+            time_m = re.search(r"<time>([\d:]+)</time>", xml)
+
+            if level_m:
+                lvl = int(level_m.group(1))
+                TRAFFIC_DATA["level"] = lvl
+                TRAFFIC_DATA["icon"] = icon_m.group(1) if icon_m else "green"
+                TRAFFIC_DATA["hint"] = hint_m.group(1).strip() if hint_m else ""
+                TRAFFIC_DATA["time"] = time_m.group(1) if time_m else ""
+                TRAFFIC_DATA["multiplier"] = LEVEL_TO_MULT.get(lvl, 1.0 + lvl * 0.15)
+                # Also update DATA for the API response
+                DATA["traffic_multiplier"] = TRAFFIC_DATA["multiplier"]
+                DATA["traffic"] = {
+                    "level": lvl,
+                    "icon": TRAFFIC_DATA["icon"],
+                    "hint": TRAFFIC_DATA["hint"],
+                    "time_msk": TRAFFIC_DATA["time"],
+                    "multiplier": TRAFFIC_DATA["multiplier"],
+                    "source": "Яндекс.Пробки"
+                }
+                print(f"[TRAFFIC] Yandex: {lvl} баллов ({TRAFFIC_DATA['icon']}) — {TRAFFIC_DATA['hint']}, x{TRAFFIC_DATA['multiplier']}")
+            else:
+                print("[TRAFFIC] No level in Yandex response")
+        except Exception as e:
+            print(f"[TRAFFIC ERR] {e}")
+            # Fallback
+            hour = (time.gmtime().tm_hour + 3) % 24
+            DATA["traffic_multiplier"] = TRAFFIC_MULT_FALLBACK.get(hour, 1.0)
+        DATA["last_update"] = time.time()
+        time.sleep(300)  # every 5 minutes
 
 
 # ============ AUTO-FETCH: WEATHER ============
@@ -485,7 +539,7 @@ def keep_alive():
 
 # ============ START BACKGROUND THREADS ============
 def start_fetchers():
-    for fn in [fetch_weather, fetch_demand, fetch_alerts, fetch_events, fetch_fuel, keep_alive]:
+    for fn in [fetch_traffic, fetch_weather, fetch_demand, fetch_alerts, fetch_events, fetch_fuel, keep_alive]:
         t = threading.Thread(target=fn, daemon=True)
         t.start()
         time.sleep(1)

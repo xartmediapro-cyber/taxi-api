@@ -44,10 +44,60 @@ TRAFFIC_MULT_FALLBACK = {
 }
 
 # Real-time traffic data from Yandex
-TRAFFIC_DATA = {"level": 0, "icon": "green", "hint": "", "time": "", "multiplier": 1.0}
+TRAFFIC_DATA = {"level": 0, "icon": "green", "hint": "", "time": "", "multiplier": 1.0, "fetched_at": 0}
 
 # Level → multiplier mapping (1-10 scale → coefficient)
 LEVEL_TO_MULT = {0: 1.0, 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.4, 5: 1.5, 6: 1.7, 7: 1.9, 8: 2.1, 9: 2.3, 10: 2.5}
+
+# ============ LAZY REFRESH: fetch fresh data if stale ============
+_refresh_lock = threading.Lock()
+
+def _fetch_traffic_now():
+    """Synchronous traffic fetch with short timeout"""
+    try:
+        req = urllib.request.Request(
+            "https://export.yandex.ru/bar/reginfo.xml?region=213",
+            headers={"User-Agent": "TaxiAssistant/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=5, context=CTX) as r:
+            xml = r.read().decode("utf-8", errors="replace")
+        level_m = re.search(r"<level>(\d+)</level>", xml)
+        icon_m = re.search(r"<icon>(\w+)</icon>", xml)
+        hint_m = re.search(r'<hint lang="ru">(.*?)</hint>', xml, re.S)
+        if level_m:
+            lvl = int(level_m.group(1))
+            TRAFFIC_DATA["level"] = lvl
+            TRAFFIC_DATA["icon"] = icon_m.group(1) if icon_m else "green"
+            TRAFFIC_DATA["hint"] = hint_m.group(1).strip() if hint_m else ""
+            TRAFFIC_DATA["time"] = time.strftime("%H:%M", time.gmtime(time.time() + 3*3600))
+            TRAFFIC_DATA["multiplier"] = LEVEL_TO_MULT.get(lvl, 1.0 + lvl * 0.15)
+            TRAFFIC_DATA["fetched_at"] = time.time()
+            DATA["traffic_multiplier"] = TRAFFIC_DATA["multiplier"]
+            DATA["traffic"] = {
+                "level": lvl, "icon": TRAFFIC_DATA["icon"],
+                "hint": TRAFFIC_DATA["hint"],
+                "time_msk": TRAFFIC_DATA["time"],
+                "multiplier": TRAFFIC_DATA["multiplier"],
+                "source": "Яндекс.Пробки",
+                "fetched_at": int(TRAFFIC_DATA["fetched_at"]),
+                "age_seconds": 0
+            }
+            DATA["last_update"] = time.time()
+            print(f"[TRAFFIC REFRESH] {lvl} баллов — {TRAFFIC_DATA['hint']}")
+            return True
+    except Exception as e:
+        print(f"[TRAFFIC REFRESH ERR] {e}")
+    return False
+
+def refresh_if_stale():
+    """Call before returning data — ensures freshness"""
+    age = time.time() - DATA.get("last_update", 0)
+    if age > 300:  # >5 min stale
+        with _refresh_lock:
+            # Double-check after acquiring lock
+            if time.time() - DATA.get("last_update", 0) > 300:
+                print(f"[REFRESH] Data is {int(age)}s old, refreshing...")
+                _fetch_traffic_now()
 
 
 # ============ HELPER: distance between coords ============
@@ -561,11 +611,14 @@ def get_alerts():
 
 @app.route("/api/traffic", methods=["GET"])
 def get_traffic():
+    refresh_if_stale()
     t = DATA.get("traffic", {})
     if not t:
         hour = (time.gmtime().tm_hour + 3) % 24
         fallback_levels = {0:1,1:1,2:1,3:1,4:1,5:2,6:4,7:7,8:9,9:8,10:5,11:4,12:5,13:5,14:4,15:5,16:7,17:9,18:10,19:8,20:6,21:4,22:3,23:2}
         t = {"level": fallback_levels.get(hour, 3), "icon": "yellow", "hint": "", "time_msk": "", "multiplier": get_traffic_multiplier(), "source": "fallback"}
+    else:
+        t["age_seconds"] = int(time.time() - TRAFFIC_DATA.get("fetched_at", 0))
     return jsonify(t)
 
 
@@ -579,6 +632,7 @@ def get_fuel():
 
 @app.route("/api/status", methods=["GET"])
 def get_status():
+    refresh_if_stale()
     ago = int(time.time() - DATA["last_update"]) if DATA["last_update"] else -1
     return jsonify({"status": "ok", "last_update_seconds_ago": ago,
                     "weather_ok": bool(DATA["weather"]),
